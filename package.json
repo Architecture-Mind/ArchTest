@@ -1,0 +1,27 @@
+{
+  "name": "archtest",
+  "version": "0.1.0",
+  "description": "Code-first API contract testing — auto-generate test cases from source code",
+  "type": "module",
+  "bin": {
+    "archtest": "./dist/index.cjs"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "tsc --noEmit --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --config jest.config.cjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.28.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

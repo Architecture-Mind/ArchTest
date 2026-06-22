@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.archtest/
+*.log
+.env
+.env.*
