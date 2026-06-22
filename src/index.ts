@@ -1,5 +1,6 @@
 import { runScan } from "./cli/commands/scan"
 import { runAnalyze } from "./cli/commands/analyze"
+import { runSnapshot } from "./cli/commands/snapshot"
 import { runRun } from "./cli/commands/run"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
@@ -76,7 +77,7 @@ async function main(): Promise<void> {
     process.exit(0)
   }
 
-  const { flags } = parseFlags(args.slice(1))
+  const { flags, positional } = parseFlags(args.slice(1))
 
   if (command === "scan") {
     await runScan(flags)
@@ -85,6 +86,11 @@ async function main(): Promise<void> {
 
   if (command === "analyze") {
     await runAnalyze(flags)
+    return
+  }
+
+  if (command === "snapshot") {
+    await runSnapshot(positional[0], flags)
     return
   }
 
