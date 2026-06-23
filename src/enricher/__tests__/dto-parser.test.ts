@@ -142,6 +142,174 @@ describe("parseDTOFile", () => {
     })
   })
 
+  describe("TypeScript type inference", () => {
+    const TYPE_DTO = `
+export class TypeDto {
+  @IsArray()
+  tags: string[]
+
+  @IsArray()
+  items: Array<string>
+
+  @IsNotEmptyObject()
+  meta: object
+
+  @IsNotEmpty()
+  data: SomeCustomType
+}
+`
+    it("infers array type from [] suffix", () => {
+      const schemas = parseDTOFile(TYPE_DTO, "dto.ts")
+      const tags = schemas[0].fields.find(f => f.name === "tags")!
+      expect(tags.type).toBe("array")
+    })
+
+    it("infers array type from Array<> syntax", () => {
+      const schemas = parseDTOFile(TYPE_DTO, "dto.ts")
+      const items = schemas[0].fields.find(f => f.name === "items")!
+      expect(items.type).toBe("array")
+    })
+
+    it("infers object type for object fields", () => {
+      const schemas = parseDTOFile(TYPE_DTO, "dto.ts")
+      const meta = schemas[0].fields.find(f => f.name === "meta")!
+      expect(meta.type).toBe("object")
+    })
+
+    it("falls back to unknown for unrecognized types", () => {
+      const schemas = parseDTOFile(TYPE_DTO, "dto.ts")
+      const data = schemas[0].fields.find(f => f.name === "data")!
+      expect(data.type).toBe("unknown")
+    })
+  })
+
+  describe("new validator decorators", () => {
+    const NEW_VALIDATORS_DTO = `
+import { IsIn, Length, IsDate, IsPhoneNumber, IsEthereumAddress, IsAlphanumeric, IsNumberString, Matches } from 'class-validator'
+
+export class NewValidatorsDto {
+  @IsIn(['active', 'inactive'])
+  status: string
+
+  @Length(3, 50)
+  name: string
+
+  @IsDate()
+  createdAt: Date
+
+  @IsPhoneNumber()
+  phone: string
+
+  @IsEthereumAddress()
+  wallet: string
+
+  @IsAlphanumeric()
+  code: string
+
+  @IsNumberString()
+  zipCode: string
+
+  @Matches(/^[A-Z]{3}$/)
+  currency: string
+}
+`
+    it("extracts @IsIn rule with values", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const status = schemas[0].fields.find(f => f.name === "status")!
+      const rule = status.rules.find(r => r.kind === "isIn")
+      expect(rule).toBeDefined()
+      expect(Array.isArray(rule?.value)).toBe(true)
+      expect((rule?.value as string[])).toContain("active")
+    })
+
+    it("extracts @Length(3, 50) as minLength + maxLength", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const name = schemas[0].fields.find(f => f.name === "name")!
+      expect(name.rules.find(r => r.kind === "minLength")?.value).toBe(3)
+      expect(name.rules.find(r => r.kind === "maxLength")?.value).toBe(50)
+    })
+
+    it("extracts @IsDate as date rule", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "createdAt")!
+      expect(f.rules.some(r => r.kind === "date")).toBe(true)
+    })
+
+    it("extracts @IsPhoneNumber as phone rule", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "phone")!
+      expect(f.rules.some(r => r.kind === "phone")).toBe(true)
+    })
+
+    it("extracts @IsEthereumAddress as ethereumAddress rule", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "wallet")!
+      expect(f.rules.some(r => r.kind === "ethereumAddress")).toBe(true)
+    })
+
+    it("extracts @IsAlphanumeric as alphanumeric rule", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "code")!
+      expect(f.rules.some(r => r.kind === "alphanumeric")).toBe(true)
+    })
+
+    it("extracts @IsNumberString as numberString rule", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "zipCode")!
+      expect(f.rules.some(r => r.kind === "numberString")).toBe(true)
+    })
+
+    it("extracts @Matches regex", () => {
+      const schemas = parseDTOFile(NEW_VALIDATORS_DTO, "dto.ts")
+      const f = schemas[0].fields.find(f => f.name === "currency")!
+      const rule = f.rules.find(r => r.kind === "regex")
+      expect(rule).toBeDefined()
+      expect(String(rule?.value)).toContain("[A-Z]")
+    })
+  })
+
+  describe("multi-line decorators", () => {
+    const MULTILINE_DTO = `
+export class MultilineDto {
+  @IsEnum(
+    MyEnum
+  )
+  role: string
+}
+`
+    it("handles decorator spanning multiple lines", () => {
+      const schemas = parseDTOFile(MULTILINE_DTO, "dto.ts")
+      expect(schemas).toHaveLength(1)
+      const role = schemas[0].fields.find(f => f.name === "role")
+      expect(role).toBeDefined()
+      expect(role?.rules.some(r => r.kind === "enum")).toBe(true)
+    })
+  })
+
+  describe("class with methods (method clears pending decorators)", () => {
+    const DTO_WITH_METHOD = `
+export class HybridDto {
+  @IsNotEmpty()
+  name: string
+
+  @IsEmail()
+  getEmail(): string {
+    return this.email
+  }
+
+  @IsString()
+  bio: string
+}
+`
+    it("does not bleed decorator from method back to next field", () => {
+      const schemas = parseDTOFile(DTO_WITH_METHOD, "dto.ts")
+      expect(schemas).toHaveLength(1)
+      const bio = schemas[0].fields.find(f => f.name === "bio")
+      // bio should have @IsString but NOT @IsEmail which was consumed by the method
+      expect(bio?.rules.some(r => r.kind === "email")).toBe(false)
+    })
+  })
+
   describe("definite assignment assertion (!)", () => {
     const DTO_WITH_BANG = `
 import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator'

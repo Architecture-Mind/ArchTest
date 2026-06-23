@@ -147,6 +147,22 @@ describe("diffSnapshots — auth changes", () => {
     const change = route.changes.find(c => c.kind === "auth_removed")
     expect(change).toBeDefined()
   })
+
+  it("detects guard_changed when guards differ (non-breaking)", () => {
+    const auth1: ContractSnapshot["routes"][0] = {
+      method: "POST", path: "/users", topology: [],
+      auth: { required: true, guards: ["JwtAuthGuard"] },
+    }
+    const auth2: ContractSnapshot["routes"][0] = {
+      method: "POST", path: "/users", topology: [],
+      auth: { required: true, guards: ["RolesGuard"] },
+    }
+    const diff = diffSnapshots(makeSnapshot([auth1]), makeSnapshot([auth2]))
+    const route = diff.changedRoutes[0]
+    expect(route.breaking).toBe(false)
+    const change = route.changes.find(c => c.kind === "guard_changed")
+    expect(change).toBeDefined()
+  })
 })
 
 // ── Field changes ─────────────────────────────────────────────────────────────
@@ -271,5 +287,65 @@ describe("diffSnapshots — rule changes", () => {
     )
     expect((change as { breaking: boolean } | undefined)?.breaking).toBe(false)
     expect(diff.hasBreakingChanges).toBe(false)
+  })
+
+  it("detects rule added — adding email constraint is breaking", () => {
+    type RequestFields = NonNullable<ContractSnapshot["routes"][0]["request"]>["fields"]
+    function routeWithFields(fields: RequestFields): ContractSnapshot["routes"][0] {
+      return {
+        method: "POST", path: "/users", topology: [],
+        auth: { required: false, guards: [] },
+        request: { dtoClass: "Dto", fields },
+      }
+    }
+    const base    = makeSnapshot([routeWithFields([{ name: "email", type: "string", rules: [{ kind: "required" }] }])])
+    const current = makeSnapshot([routeWithFields([{ name: "email", type: "string", rules: [{ kind: "required" }, { kind: "email" }] }])])
+    const diff = diffSnapshots(base, current)
+    const change = diff.changedRoutes[0]?.changes.find(
+      c => c.kind === "rule_changed" && (c as { rule: string }).rule === "email"
+    )
+    expect(change).toBeDefined()
+    expect((change as { breaking: boolean }).breaking).toBe(true)
+  })
+
+  it("detects rule removed — removing min constraint is non-breaking", () => {
+    type RequestFields = NonNullable<ContractSnapshot["routes"][0]["request"]>["fields"]
+    function routeWithFields(fields: RequestFields): ContractSnapshot["routes"][0] {
+      return {
+        method: "POST", path: "/users", topology: [],
+        auth: { required: false, guards: [] },
+        request: { dtoClass: "Dto", fields },
+      }
+    }
+    const base    = makeSnapshot([routeWithFields([{ name: "age", type: "number", rules: [{ kind: "required" }, { kind: "min", value: 18 }] }])])
+    const current = makeSnapshot([routeWithFields([{ name: "age", type: "number", rules: [{ kind: "required" }] }])])
+    const diff = diffSnapshots(base, current)
+    const change = diff.changedRoutes[0]?.changes.find(
+      c => c.kind === "rule_changed" && (c as { rule: string }).rule === "min"
+    )
+    expect(change).toBeDefined()
+    expect((change as { breaking: boolean }).breaking).toBe(false)
+    expect(diff.hasBreakingChanges).toBe(false)
+  })
+
+  it("treats optional→required change as breaking (adding required rule)", () => {
+    type RequestFields = NonNullable<ContractSnapshot["routes"][0]["request"]>["fields"]
+    function routeWithFields(fields: RequestFields): ContractSnapshot["routes"][0] {
+      return {
+        method: "POST", path: "/users", topology: [],
+        auth: { required: false, guards: [] },
+        request: { dtoClass: "Dto", fields },
+      }
+    }
+    // Field was optional, now required — breaking because existing clients may not send it
+    const base    = makeSnapshot([routeWithFields([{ name: "tag", type: "string", rules: [{ kind: "optional" }] }])])
+    const current = makeSnapshot([routeWithFields([{ name: "tag", type: "string", rules: [{ kind: "required" }] }])])
+    const diff = diffSnapshots(base, current)
+    const change = diff.changedRoutes[0]?.changes.find(
+      c => c.kind === "rule_changed" && (c as { rule: string }).rule === "required"
+    )
+    expect(change).toBeDefined()
+    expect((change as { breaking: boolean }).breaking).toBe(true)
+    expect(diff.hasBreakingChanges).toBe(true)
   })
 })

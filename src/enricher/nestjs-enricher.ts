@@ -79,6 +79,17 @@ function looksLikeDTO(content: string, _className: string): boolean {
     content.includes("@MinLength") ||
     content.includes("@MaxLength") ||
     content.includes("@IsOptional") ||
-    content.includes("@IsEnum")
+    content.includes("@IsEnum") ||
+    content.includes("@IsIn(") ||
+    content.includes("@Length(") ||
+    content.includes("@IsDate") ||
+    content.includes("@IsPhoneNumber") ||
+    content.includes("@IsEthereumAddress") ||
+    content.includes("@IsAlphanumeric") ||
+    content.includes("@IsNumberString") ||
+    content.includes("@ArrayNotEmpty") ||
+    content.includes("@IsUUID") ||
+    content.includes("@IsUrl") ||
+    content.includes("@Matches(")
   )
 }
