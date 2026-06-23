@@ -3,6 +3,7 @@ import { runAnalyze } from "./cli/commands/analyze"
 import { runSnapshot } from "./cli/commands/snapshot"
 import { runGenerate } from "./cli/commands/generate"
 import { runVerify } from "./cli/commands/verify"
+import { runLintCmd } from "./cli/commands/lint"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
   const flags: Record<string, string> = {}
@@ -61,6 +62,12 @@ function printHelp(): void {
     "      --report <file>       Save JSON report to file",
     "      --json                Print full JSON report instead of human output",
     "",
+    "  archtest lint --project <path>",
+    "    Static analysis — detect validation gaps and security issues without a server",
+    "    Options:",
+    "      --min-severity <high|warn|info>  Minimum severity to report (default: info)",
+    "      --json                           Output as JSON",
+    "",
     "  archtest scan --project <path>",
     "    Low-level: show routes + security findings only",
     "",
@@ -111,6 +118,11 @@ async function main(): Promise<void> {
 
   if (command === "verify" || command === "run") {
     await runVerify(flags)
+    return
+  }
+
+  if (command === "lint") {
+    await runLintCmd(flags)
     return
   }
 
