@@ -4,6 +4,7 @@ import { runSnapshot } from "./cli/commands/snapshot"
 import { runGenerate } from "./cli/commands/generate"
 import { runVerify } from "./cli/commands/verify"
 import { runLintCmd } from "./cli/commands/lint"
+import { runFuzzCmd } from "./cli/commands/fuzz"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
   const flags: Record<string, string> = {}
@@ -61,6 +62,15 @@ function printHelp(): void {
     "      --concurrency <n>     Parallel requests (default: 5)",
     "      --report <file>       Save JSON report to file",
     "      --json                Print full JSON report instead of human output",
+    "",
+    "  archtest fuzz --project <path> --base-url <url>",
+    "    Fire edge-case payloads to find 500 errors and validation bypasses",
+    "    Options:",
+    "      --base-url <url>      Running server URL (required)",
+    "      --timeout <ms>        Per-request timeout (default: 5000)",
+    "      --concurrency <n>     Parallel requests (default: 5)",
+    "      --report <file>       Save JSON report to file",
+    "      --json                Output as JSON",
     "",
     "  archtest lint --project <path>",
     "    Static analysis — detect validation gaps and security issues without a server",
@@ -123,6 +133,11 @@ async function main(): Promise<void> {
 
   if (command === "lint") {
     await runLintCmd(flags)
+    return
+  }
+
+  if (command === "fuzz") {
+    await runFuzzCmd(flags)
     return
   }
 
