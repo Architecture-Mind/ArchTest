@@ -1,56 +1,23 @@
-export type RuleKind =
-  | "required"
-  | "optional"
-  | "email"
-  | "url"
-  | "uuid"
-  | "min"
-  | "max"
-  | "minLength"
-  | "maxLength"
-  | "integer"
-  | "positive"
-  | "negative"
-  | "boolean"
-  | "array"
-  | "arrayMinSize"
-  | "arrayMaxSize"
-  | "enum"
-  | "regex"
-  | "isIn"
-  | "date"
-  | "phone"
-  | "ethereumAddress"
-  | "alphanumeric"
-  | "numberString"
+// Field-level validation types — sourced from @kidkender/archmind-protocol
+export type {
+  RuleKind,
+  ValidationRule,
+  FieldType,
+  FieldSchema,
+  DTOSchema,
+} from "@kidkender/archmind-protocol"
 
-export interface ValidationRule {
-  kind: RuleKind
-  value?: number | string | string[]
-}
-
-export type FieldType = "string" | "number" | "boolean" | "object" | "array" | "unknown"
-
-export interface FieldSchema {
-  name: string
-  type: FieldType
-  rules: ValidationRule[]
-}
-
-export interface DTOSchema {
-  className: string
-  /** Relative path to the source file inside the scanned project */
-  file: string
-  fields: FieldSchema[]
-}
+// EnrichedGraph is archtest-specific: an IR graph enriched with resolved DTOSchemas
+import type { DTOSchema } from "@kidkender/archmind-protocol"
+import type { ExecutionNode, ExecutionEdge } from "@kidkender/archmind-protocol"
 
 export interface EnrichedGraph {
   entrypoint: string
-  method: string
-  path: string
-  nodes: import("../types").ExecutionNode[]
-  edges: import("../types").ExecutionEdge[]
+  method:     string
+  path:       string
+  nodes:      ExecutionNode[]
+  edges:      ExecutionEdge[]
   framework?: string
-  /** DTOs bound to this route's validation_gate nodes */
-  dtos: DTOSchema[]
+  /** DTOs resolved from ir:validation_gate nodes */
+  dtos:       DTOSchema[]
 }
