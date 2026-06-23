@@ -107,8 +107,7 @@ function buildFieldSchema(name: string, rawType: string, decorators: string[]): 
   const tsType = inferTsType(rawType)
 
   for (const dec of decorators) {
-    const parsed = parseDecorator(dec)
-    if (parsed) rules.push(parsed)
+    rules.push(...parseDecorator(dec))
   }
 
   // If no explicit required/optional decorator, infer from TS optional marker
@@ -134,23 +133,34 @@ function inferTsType(raw: string): FieldType {
 
 // Maps decorator name → RuleKind (for zero-arg decorators)
 const ZERO_ARG_RULES: Record<string, RuleKind> = {
-  IsNotEmpty:  "required",
-  IsOptional:  "optional",
-  IsString:    "required",   // presence rule; type inferred from TS
-  IsInt:       "integer",
-  IsNumber:    "required",
-  IsBoolean:   "boolean",
-  IsEmail:     "email",
-  IsUrl:       "url",
-  IsUUID:      "uuid",
-  IsArray:     "array",
-  IsPositive:  "positive",
-  IsNegative:  "negative",
-  IsDefined:   "required",
+  IsNotEmpty:       "required",
+  IsOptional:       "optional",
+  IsString:         "required",   // presence rule; type inferred from TS
+  IsInt:            "integer",
+  IsNumber:         "required",
+  IsBoolean:        "boolean",
+  IsEmail:          "email",
+  IsUrl:            "url",
+  IsUUID:           "uuid",
+  IsArray:          "array",
+  IsPositive:       "positive",
+  IsNegative:       "negative",
+  IsDefined:        "required",
   IsNotEmptyObject: "required",
+  IsDate:           "date",
+  IsDateString:     "date",
+  IsPhoneNumber:    "phone",
+  IsEthereumAddress: "ethereumAddress",
+  IsAlphanumeric:   "alphanumeric",
+  IsNumberString:   "numberString",
+  ArrayNotEmpty:    "array",
 }
 
-function parseDecorator(line: string): ValidationRule | null {
+/**
+ * Parses one decorator line and returns 0, 1, or 2 validation rules.
+ * Returns multiple rules for decorators like @Length(min, max).
+ */
+function parseDecorator(line: string): ValidationRule[] {
   // Strip leading @
   const body = line.startsWith("@") ? line.slice(1) : line
 
@@ -161,31 +171,52 @@ function parseDecorator(line: string): ValidationRule | null {
 
   // Zero-arg decorators
   if (name in ZERO_ARG_RULES) {
-    return { kind: ZERO_ARG_RULES[name] }
+    return [{ kind: ZERO_ARG_RULES[name] }]
   }
 
   // Numeric-arg decorators
   const numArg = parseFloat(argsStr)
   switch (name) {
-    case "Min":         return !isNaN(numArg) ? { kind: "min", value: numArg } : null
-    case "Max":         return !isNaN(numArg) ? { kind: "max", value: numArg } : null
-    case "MinLength":   return !isNaN(numArg) ? { kind: "minLength", value: numArg } : null
-    case "MaxLength":   return !isNaN(numArg) ? { kind: "maxLength", value: numArg } : null
-    case "ArrayMinSize": return !isNaN(numArg) ? { kind: "arrayMinSize", value: numArg } : null
-    case "ArrayMaxSize": return !isNaN(numArg) ? { kind: "arrayMaxSize", value: numArg } : null
+    case "Min":          return !isNaN(numArg) ? [{ kind: "min",          value: numArg }] : []
+    case "Max":          return !isNaN(numArg) ? [{ kind: "max",          value: numArg }] : []
+    case "MinLength":    return !isNaN(numArg) ? [{ kind: "minLength",    value: numArg }] : []
+    case "MaxLength":    return !isNaN(numArg) ? [{ kind: "maxLength",    value: numArg }] : []
+    case "ArrayMinSize": return !isNaN(numArg) ? [{ kind: "arrayMinSize", value: numArg }] : []
+    case "ArrayMaxSize": return !isNaN(numArg) ? [{ kind: "arrayMaxSize", value: numArg }] : []
+
+    case "Length": {
+      // @Length(minLen, maxLen) → emit both rules
+      const parts = argsStr.split(",").map(s => parseFloat(s.trim()))
+      const rules: ValidationRule[] = []
+      if (!isNaN(parts[0])) rules.push({ kind: "minLength", value: parts[0] })
+      if (parts[1] !== undefined && !isNaN(parts[1])) rules.push({ kind: "maxLength", value: parts[1] })
+      return rules
+    }
 
     case "IsEnum": {
-      // @IsEnum(Role) — we capture the enum name as a string; generator will skip unknown values
       const enumName = argsStr.trim()
-      return enumName ? { kind: "enum", value: enumName } : null
+      return enumName ? [{ kind: "enum", value: enumName }] : []
+    }
+
+    case "IsIn": {
+      // @IsIn(['a', 'b', 'c']) — inline string array
+      const values = parseStringArray(argsStr)
+      // Always emit the rule; values may be empty if using a const reference
+      return [{ kind: "isIn", value: values }]
     }
 
     case "Matches": {
-      // @Matches(/pattern/) or @Matches(/pattern/flags)
       const regexMatch = argsStr.match(/^\/(.+)\/([gimsuy]*)$/)
-      return regexMatch ? { kind: "regex", value: `/${regexMatch[1]}/${regexMatch[2]}` } : null
+      return regexMatch ? [{ kind: "regex", value: `/${regexMatch[1]}/${regexMatch[2]}` }] : []
     }
   }
 
-  return null
+  return []
+}
+
+/** Extracts string literals from an array expression like `['a', 'b']` or `["a","b"]`. */
+function parseStringArray(argsStr: string): string[] {
+  const arrayMatch = argsStr.match(/\[([^\]]*)\]/)
+  if (!arrayMatch) return []
+  return [...arrayMatch[1].matchAll(/['"]([^'"]*)['"]/g)].map(m => m[1])
 }

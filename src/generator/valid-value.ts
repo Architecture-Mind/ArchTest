@@ -11,9 +11,21 @@ export function validValue(field: FieldSchema): unknown {
     rules.find(r => r.kind === kind)?.value
 
   // Format-specific values
-  if (has("email"))   return "test@example.com"
-  if (has("url"))     return "https://example.com"
-  if (has("uuid"))    return "550e8400-e29b-41d4-a716-446655440000"
+  if (has("email"))           return "test@example.com"
+  if (has("url"))             return "https://example.com"
+  if (has("uuid"))            return "550e8400-e29b-41d4-a716-446655440000"
+  if (has("ethereumAddress")) return "0x742d35Cc6634C0532925a3b8D4C9b4C5A91B7CF"
+  if (has("phone"))           return "+84901234567"
+  if (has("date"))            return "2024-01-15T00:00:00.000Z"
+  if (has("alphanumeric"))    return "abc123"
+  if (has("numberString"))    return "12345"
+
+  // Allowed-values list — pick the first entry
+  if (has("isIn")) {
+    const allowed = rules.find(r => r.kind === "isIn")?.value
+    if (Array.isArray(allowed) && allowed.length > 0) return allowed[0]
+    return `test_${field.name}`
+  }
 
   // Boolean
   if (has("boolean") || field.type === "boolean") return true

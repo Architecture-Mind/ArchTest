@@ -42,6 +42,85 @@ export function invalidCasesForField(field: FieldSchema): InvalidCase[] {
     })
   }
 
+  // --- isIn (allowed values) ---
+  if (has("isIn")) {
+    const allowed = rules.find(r => r.kind === "isIn")?.value
+    const list = Array.isArray(allowed) ? allowed : []
+    cases.push({
+      category:    "invalid_format",
+      description: `${field.name} not in allowed values`,
+      value:       "__INVALID_OPTION__",
+    })
+    if (list.length > 0) {
+      cases.push({
+        category:    "wrong_type",
+        description: `${field.name} is a number instead of allowed string`,
+        value:       99999,
+      })
+    }
+    return cases
+  }
+
+  // --- ethereumAddress ---
+  if (has("ethereumAddress")) {
+    for (const bad of ["not-an-address", "0xinvalid", "0x123"]) {
+      cases.push({
+        category:    "invalid_format",
+        description: `${field.name} invalid Ethereum address: "${bad}"`,
+        value:       bad,
+      })
+    }
+    return cases
+  }
+
+  // --- phone ---
+  if (has("phone")) {
+    for (const bad of ["not-a-phone", "12345", "abc"]) {
+      cases.push({
+        category:    "invalid_format",
+        description: `${field.name} invalid phone: "${bad}"`,
+        value:       bad,
+      })
+    }
+    return cases
+  }
+
+  // --- date ---
+  if (has("date")) {
+    for (const bad of ["not-a-date", "2024-99-99", "tomorrow"]) {
+      cases.push({
+        category:    "invalid_format",
+        description: `${field.name} invalid date: "${bad}"`,
+        value:       bad,
+      })
+    }
+    return cases
+  }
+
+  // --- alphanumeric ---
+  if (has("alphanumeric")) {
+    for (const bad of ["hello world", "abc-123", "test!@#"]) {
+      cases.push({
+        category:    "invalid_format",
+        description: `${field.name} not alphanumeric: "${bad}"`,
+        value:       bad,
+      })
+    }
+    return cases
+  }
+
+  // --- numberString ---
+  if (has("numberString")) {
+    for (const bad of ["not-a-number", "12.ab", "abc"]) {
+      cases.push({
+        category:    "invalid_format",
+        description: `${field.name} not a numeric string: "${bad}"`,
+        value:       bad,
+      })
+    }
+    return cases
+  }
+
   // --- invalid_format (email) ---
   if (has("email")) {
     for (const bad of ["not-an-email", "abc@", "@domain.com", "plain-string", ""]) {

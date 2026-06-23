@@ -17,6 +17,12 @@ export type RuleKind =
   | "arrayMaxSize"
   | "enum"
   | "regex"
+  | "isIn"
+  | "date"
+  | "phone"
+  | "ethereumAddress"
+  | "alphanumeric"
+  | "numberString"
 
 export interface ValidationRule {
   kind: RuleKind
