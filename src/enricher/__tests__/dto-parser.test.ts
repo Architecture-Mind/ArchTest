@@ -141,4 +141,47 @@ describe("parseDTOFile", () => {
       expect(age.rules.some(r => r.kind === "integer")).toBe(true)
     })
   })
+
+  describe("definite assignment assertion (!)", () => {
+    const DTO_WITH_BANG = `
+import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator'
+
+export class CreateComponentDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  parentApp!: string;
+
+  @IsOptional()
+  @MaxLength(50)
+  userRole?: string;
+}
+`
+    it("parses fields with ! (non-null assertion) correctly", () => {
+      const schemas = parseDTOFile(DTO_WITH_BANG, "dto.ts")
+      expect(schemas).toHaveLength(1)
+      const fields = schemas[0].fields.map(f => f.name)
+      expect(fields).toContain("name")
+      expect(fields).toContain("parentApp")
+      expect(fields).toContain("userRole")
+    })
+
+    it("does not merge rules from required fields into optional ones", () => {
+      const schemas = parseDTOFile(DTO_WITH_BANG, "dto.ts")
+      const userRole = schemas[0].fields.find(f => f.name === "userRole")!
+      const maxLength = userRole.rules.find(r => r.kind === "maxLength")
+      // userRole should have maxLength 50, not name's 255
+      expect(maxLength?.value).toBe(50)
+    })
+
+    it("extracts maxLength rule on ! field", () => {
+      const schemas = parseDTOFile(DTO_WITH_BANG, "dto.ts")
+      const name = schemas[0].fields.find(f => f.name === "name")!
+      expect(name.rules.some(r => r.kind === "maxLength" && r.value === 255)).toBe(true)
+    })
+  })
 })

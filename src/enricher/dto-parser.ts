@@ -74,8 +74,8 @@ function parseClassBody(lines: string[], startLine: number): { fields: FieldSche
       continue
     }
 
-    // Field declaration: `fieldName: Type` or `fieldName?: Type` or `readonly fieldName: Type`
-    const fieldMatch = line.match(/^(?:readonly\s+)?(\w+)\??:\s*([\w\[\]<>|&\s]+?)(?:\s*=.*)?;?\s*$/)
+    // Field declaration: `fieldName: Type`, `fieldName?: Type`, `fieldName!: Type` or `readonly fieldName: Type`
+    const fieldMatch = line.match(/^(?:readonly\s+)?(\w+)[?!]?:\s*([\w\[\]<>|&\s]+?)(?:\s*=.*)?;?\s*$/)
     if (fieldMatch && pendingDecorators.length > 0 && depth === 1) {
       const fieldName = fieldMatch[1]
       const rawType   = fieldMatch[2].trim()
