@@ -1,6 +1,6 @@
 import { resolve } from "path"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { runLint } from "../../linter/runner"
 import type { LintResult, LintSeverity } from "../../linter/types"
 

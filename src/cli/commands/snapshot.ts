@@ -1,6 +1,6 @@
 import { resolve } from "path"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { captureSnapshot } from "../../snapshot/capture"
 import { saveSnapshot, loadSnapshot, snapshotPath } from "../../snapshot/store"
 import { diffSnapshots } from "../../snapshot/diff"

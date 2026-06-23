@@ -1,7 +1,7 @@
 import { resolve } from "path"
 import { writeFileSync } from "fs"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { generateAllTestCases } from "../../generator/index"
 import { runAll } from "../../executor/runner"
 import type { TestResult, RunSummary } from "../../executor/types"
@@ -40,7 +40,7 @@ export async function runVerify(flags: Record<string, string>): Promise<void> {
   const { framework, graphs, findings } = scanResult
 
   // ── 2. Enrich ────────────────────────────────────────────────────────────────
-  const enriched = enrichGraphs(graphs, { projectRoot: resolve(projectRoot) })
+  const enriched = enrichGraphs(graphs, { projectRoot: resolve(projectRoot), framework })
 
   // ── 3. Generate ──────────────────────────────────────────────────────────────
   const tokens = flags["token"] ? { valid: flags["token"] } : undefined

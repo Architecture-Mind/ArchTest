@@ -1,7 +1,7 @@
 import { resolve } from "path"
 import { writeFileSync } from "fs"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { buildFuzzCases, runFuzz } from "../../fuzzer/runner"
 import type { FuzzResult, FuzzSummary } from "../../fuzzer/types"
 
@@ -36,7 +36,7 @@ export async function runFuzzCmd(flags: Record<string, string>): Promise<void> {
     process.exit(1)
   }
 
-  const enriched = enrichGraphs(scanResult.graphs, { projectRoot: resolve(projectRoot) })
+  const enriched = enrichGraphs(scanResult.graphs, { projectRoot: resolve(projectRoot), framework: scanResult.framework })
 
   // ── 2. Build fuzz cases ───────────────────────────────────────────────────────
   const cases = buildFuzzCases(enriched)

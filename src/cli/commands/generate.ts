@@ -1,7 +1,7 @@
 import { resolve, join } from "path"
 import { mkdirSync, writeFileSync } from "fs"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { generateAllTestCases } from "../../generator/index"
 import { generateJestFiles } from "../../codegen/jest-writer"
 

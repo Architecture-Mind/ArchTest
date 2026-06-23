@@ -1,6 +1,6 @@
 import { resolve } from "path"
 import { scanProject } from "../../archmind/scanner"
-import { enrichGraphs } from "../../enricher/nestjs-enricher"
+import { enrichGraphs } from "../../enricher/index"
 import { generateAllTestCases } from "../../generator/index"
 import type { EnrichedGraph } from "../../enricher/types"
 import type { TestCase } from "../../generator/types"
@@ -36,7 +36,7 @@ export async function runAnalyze(flags: Record<string, string>): Promise<void> {
   const { framework, graphs, findings } = scanResult
 
   // ── 2. Enrich ────────────────────────────────────────────────────────────────
-  let enriched = enrichGraphs(graphs, { projectRoot: resolve(projectRoot) })
+  let enriched = enrichGraphs(graphs, { projectRoot: resolve(projectRoot), framework })
 
   if (routeFilter) {
     const needle = routeFilter.toLowerCase()
