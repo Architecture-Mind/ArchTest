@@ -2,7 +2,7 @@ import { runScan } from "./cli/commands/scan"
 import { runAnalyze } from "./cli/commands/analyze"
 import { runSnapshot } from "./cli/commands/snapshot"
 import { runGenerate } from "./cli/commands/generate"
-import { runRun } from "./cli/commands/run"
+import { runVerify } from "./cli/commands/verify"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
   const flags: Record<string, string> = {}
@@ -51,14 +51,15 @@ function printHelp(): void {
     "      --base-url <url>      Default server URL in generated files",
     "      --json                Output metadata as JSON instead of writing files",
     "",
-    "  archtest run --project <path> --base-url <url>",
-    "    Execute generated test cases against a running server",
+    "  archtest verify --project <path> --base-url <url>",
+    "    Execute test cases against a running server and report results",
     "    Options:",
     "      --base-url <url>      Running server URL (required)",
     "      --token <jwt>         Auth token for happy-path requests",
-    "      --timeout <ms>        Per-request timeout, default 5000",
-    "      --concurrency <n>     Parallel requests, default 5",
-    "      --json                Output results as JSON",
+    "      --timeout <ms>        Per-request timeout (default: 5000)",
+    "      --concurrency <n>     Parallel requests (default: 5)",
+    "      --report <file>       Save JSON report to file",
+    "      --json                Print full JSON report instead of human output",
     "",
     "  archtest scan --project <path>",
     "    Low-level: show routes + security findings only",
@@ -71,7 +72,8 @@ function printHelp(): void {
     "  archtest snapshot save --project ./my-nestjs-app",
     "  archtest snapshot diff --project ./my-nestjs-app",
     "  archtest generate --project ./my-nestjs-app --output ./tests/contract",
-    "  archtest run      --project ./my-nestjs-app --base-url http://localhost:3000",
+    "  archtest verify   --project ./my-nestjs-app --base-url http://localhost:3000",
+    "  archtest verify   --project ./my-nestjs-app --base-url http://localhost:3000 --report results.json",
     "",
   ].join("\n"))
 }
@@ -107,8 +109,8 @@ async function main(): Promise<void> {
     return
   }
 
-  if (command === "run") {
-    await runRun(flags)
+  if (command === "verify" || command === "run") {
+    await runVerify(flags)
     return
   }
 
