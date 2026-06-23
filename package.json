@@ -1,7 +1,7 @@
 {
   "name": "@kidkender/archtest",
-  "version": "0.1.0",
-  "description": "Code-first API contract testing — auto-discover routes, generate test cases, detect breaking changes. No server required.",
+  "version": "0.2.0",
+  "description": "Code-first API contract intelligence — analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
   "type": "module",
   "bin": {
     "archtest": "./dist/index.cjs"
@@ -32,11 +32,14 @@
   },
   "keywords": [
     "nestjs",
+    "laravel",
     "api-testing",
     "contract-testing",
     "static-analysis",
     "test-generation",
     "snapshot",
+    "fuzzing",
+    "linter",
     "cli"
   ],
   "license": "MIT",

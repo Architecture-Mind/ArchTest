@@ -1,8 +1,8 @@
 # ArchTest
 
-Code-first API contract intelligence. Reads your source code, extracts validation rules, tracks contract changes — no Swagger, no manual test writing, no AI required.
+Code-first API contract intelligence. Reads your source code, extracts validation rules, tracks contract changes, and catches regressions — no Swagger, no manual test writing, no AI required.
 
-Built on top of [ArchMind](https://github.com/kidkender/archmind).
+Built on top of [ArchMind](https://github.com/Architecture-Mind/ArchMind).
 
 ---
 
@@ -13,15 +13,25 @@ Code      ≠ Swagger
 Swagger   ≠ Production
 ```
 
-Most API testing tools depend on documentation that's always out of date.
+Most API testing tools depend on documentation that's always out of date. ArchTest reads **source code directly** — your validation rules are the source of truth.
 
-ArchTest reads **source code directly** — your validation rules are the source of truth.
+---
+
+## Installation
+
+```bash
+npm install -g @kidkender/archtest
+```
+
+That's it. ArchMind is bundled — no separate install required.
 
 ---
 
 ## Commands
 
 ### `analyze` — Static contract analysis (no server needed)
+
+Discover routes, extract validation rules, preview generated test cases — all from source code alone.
 
 ```bash
 archtest analyze --project ./my-nestjs-app
@@ -44,26 +54,26 @@ Cases     : 247 generated
 
   PUT /users/:id                       28 cases
     ...
-
-To execute against a server: archtest run --project . --base-url <url>
-To save contract snapshot:   archtest snapshot save --project .
 ```
 
 Filter to a specific route:
 
 ```bash
 archtest analyze --project . --route "POST /users"
+archtest analyze --project . --json   # machine-readable output
 ```
 
 ---
 
-### `snapshot` — Track contract changes across commits *(coming soon)*
+### `snapshot` — Track contract changes across commits
+
+Save your API contract as a baseline, then detect breaking changes automatically.
 
 ```bash
-# Save current contract as baseline
+# Save current contract
 archtest snapshot save --project .
 
-# Detect breaking changes
+# Check for breaking changes vs baseline
 archtest snapshot diff --project .
 ```
 
@@ -75,52 +85,134 @@ NEW FIELD  POST /users
   phone: required, string
 ```
 
-Commit `.archtest/contract.json` to git. Run `snapshot diff` in CI.
-
----
-
-### `run` — Execute tests against a live server
-
 ```bash
-archtest run --project . --base-url http://localhost:3000
+# Accept changes as new baseline
+archtest snapshot approve --project .
 ```
 
-```
-  [001/247] ✓ POST /users — valid payload
-  [002/247] ✗ POST /users — email is missing
-  [003/247] ✓ POST /users — invalid email format
+Commit `.archtest/contract.json` to git. Add `snapshot diff` to CI — it exits `1` on breaking changes.
 
-Results: PASS 246  FAIL 1  ERROR 0  (1243ms)
+```yaml
+# .github/workflows/contract.yml
+- name: Check API contract drift
+  run: npx archtest snapshot diff --project .
 ```
 
 ---
 
-## Installation
+### `generate` — Generate Jest test files
 
-Requires [archmind](https://github.com/kidkender/archmind) on PATH:
-
-```bash
-npm install -g @kidkender/archmind
-```
-
-Then clone and build ArchTest:
+Turn your API contract into runnable Jest spec files that you own and commit.
 
 ```bash
-git clone https://github.com/your-org/archtest
-cd archtest
-npm install
-npm run build
-npm link          # makes `archtest` available globally
+archtest generate --project . --output ./tests/contract
 ```
+
+```typescript
+// generated: tests/contract/POST-users.spec.ts
+describe("POST /users", () => {
+  it("accepts valid payload", async () => { ... })
+  it("rejects missing email", async () => { ... })
+  it("rejects age below minimum (17)", async () => { ... })
+  // ... 29 more cases
+})
+```
+
+---
+
+### `verify` — Execute tests against a live server
+
+Run the full generated test suite against a running server and report results.
+
+```bash
+archtest verify --project . --base-url http://localhost:3000
+```
+
+```
+  ✓ POST /users                        32/32 passed
+  ✗ PUT /users/:id                     1 failed, 27 passed
+      ✗ age is a float (not integer)  expected 400, got 200
+
+FAIL  27 passed  1 failed  0 errors  (1243ms)
+```
+
+Options:
+
+```bash
+archtest verify --project . --base-url http://localhost:3000 \
+  --token <jwt>           # auth token for happy-path requests
+  --timeout 10000         # per-request timeout in ms
+  --concurrency 10        # parallel requests
+  --report results.json   # save JSON report
+  --json                  # machine-readable output (for CI)
+```
+
+---
+
+### `lint` — Static analysis for validation gaps
+
+Detect missing validation, weak fields, and unprotected routes — without running a server.
+
+```bash
+archtest lint --project .
+```
+
+```
+  HIGH  DELETE /users/:id    [L003] DELETE route has no auth guard
+  HIGH  POST /orders         [L004] POST route accepts body but has no DTO validation
+  WARN  POST /auth/register  [L002] field "password" has no minLength constraint
+  INFO  POST /users          [L005] field "role" looks like enum but has no IsIn constraint
+
+4 issues found (2 HIGH, 1 WARN, 1 INFO)
+```
+
+Exits `1` if any HIGH issues are found. Use in CI as a quality gate:
+
+```bash
+archtest lint --project . --min-severity warn
+archtest lint --project . --json   # machine-readable output
+```
+
+**Built-in rules:**
+
+| Code | Severity | Description |
+|------|----------|-------------|
+| L001 | WARN | DTO has no validated fields |
+| L002 | WARN | Password/secret field has no minLength |
+| L003 | HIGH | POST/PUT/PATCH/DELETE route has no auth guard |
+| L004 | HIGH | Write route accepts body but has no DTO |
+| L005 | INFO | Field name suggests enum but no `IsIn`/`IsEnum` constraint |
+
+---
+
+### `fuzz` — Fire edge-case payloads to find 500 errors
+
+Bombard your API with extreme values to find unhandled exceptions and validation bypasses.
+
+```bash
+archtest fuzz --project . --base-url http://localhost:3000
+```
+
+```
+Fuzzing 12 routes with 847 edge-case payloads...
+
+  🐛 CRASH   POST /users  field: age    [overflow_number]  → 500 Internal Server Error
+  🐛 CRASH   POST /users  field: bio    [unicode_edge]     → 500 Internal Server Error
+  ⚠ BYPASS  POST /items  field: price  [sql_injection]    → 200 OK (validation bypassed?)
+
+FINDINGS  2 crashes  847 payloads  (3241ms)
+```
+
+Fuzz categories: `overflow_number`, `very_long_string`, `unicode_edge`, `sql_injection`, `template_injection`, `xss`, `type_confusion`, `whitespace_or_empty`, and more.
 
 ---
 
 ## Supported Frameworks
 
-| Framework | Status |
-|-----------|--------|
-| NestJS (class-validator) | ✅ MVP |
-| Laravel (FormRequest) | 🔜 Phase 2 |
+| Framework | Detect routes | Extract validation rules |
+|-----------|--------------|--------------------------|
+| NestJS (class-validator) | ✅ | ✅ |
+| Laravel (FormRequest) | ✅ | ✅ |
 
 ---
 
@@ -129,16 +221,17 @@ npm link          # makes `archtest` available globally
 ```
 Source Code
     ↓
-archmind scan        — extract routes, auth gates, DTO references
+@kidkender/archmind         — extract routes, auth gates, DTO references
     ↓
-dto-parser           — read class-validator decorators field by field
+@kidkender/archmind-nestjs-parser  — read class-validator decorators field by field
+@kidkender/archmind-laravel-parser — read FormRequest rules() method
     ↓
-generator            — produce test cases per validation rule
+generator                   — produce test cases per validation rule
     ↓
-analyze / snapshot / run
+analyze / snapshot / generate / verify / lint / fuzz
 ```
 
-Example: given this DTO:
+Given this DTO:
 
 ```typescript
 export class CreateUserDto {
@@ -169,18 +262,18 @@ POST /users
 
 ---
 
-## Roadmap
-
-| Phase | Feature | Status |
-|-------|---------|--------|
-| 1 | Contract Analysis (`analyze`) | ✅ Done |
-| 2 | Contract Snapshot + Diff | 🔜 Next |
-| 3 | Test Code Generation | 📋 Planned |
-| 4 | Runtime Verification (`run`) | ✅ Done |
-
----
-
 ## Requirements
 
 - Node.js 18+
-- [archmind](https://github.com/kidkender/archmind) on PATH
+- A NestJS or Laravel project to scan
+
+---
+
+## Related Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@kidkender/archmind`](https://www.npmjs.com/package/@kidkender/archmind) | CLI that extracts route graphs from source code |
+| [`@kidkender/archmind-protocol`](https://www.npmjs.com/package/@kidkender/archmind-protocol) | Shared IR type vocabulary |
+| [`@kidkender/archmind-nestjs-parser`](https://www.npmjs.com/package/@kidkender/archmind-nestjs-parser) | NestJS route + DTO parser |
+| [`@kidkender/archmind-laravel-parser`](https://www.npmjs.com/package/@kidkender/archmind-laravel-parser) | Laravel route + FormRequest parser |
