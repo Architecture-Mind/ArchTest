@@ -1,31 +1,14 @@
-// IR types mirrored from @archmind/protocol — no hard dependency needed
-export interface ExecutionNode {
-  id: string
-  type: string
-  symbol: string
-  file?: string
-  args?: string[]
-  role?: string
-  detail?: string
-}
+// Core IR types — sourced from @kidkender/archmind-protocol
+// Re-exported with archtest-local aliases for backward compatibility.
+export type {
+  ExecutionNode,
+  ExecutionEdge,
+} from "@kidkender/archmind-protocol"
 
-export interface ExecutionEdge {
-  from: string
-  to: string
-  relation: string
-  traceability: string
-  mechanism?: string
-}
+// Protocol uses IntermediateExecutionGraph; archtest calls it ExecutionGraph
+export type { IntermediateExecutionGraph as ExecutionGraph } from "@kidkender/archmind-protocol"
 
-export interface ExecutionGraph {
-  entrypoint: string
-  method: string
-  path: string
-  nodes: ExecutionNode[]
-  edges: ExecutionEdge[]
-  framework?: string
-  ir_ver?: string
-}
+// ── Archtest-specific types (not in protocol) ─────────────────────────────────
 
 export interface Finding {
   type: string
@@ -45,7 +28,7 @@ export interface RouteFinding {
 export interface TraceJsonOutput {
   framework: string
   routes_found: number
-  graphs: ExecutionGraph[]
+  graphs: import("@kidkender/archmind-protocol").IntermediateExecutionGraph[]
 }
 
 // Output shape of `archmind findings --json`
