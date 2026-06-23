@@ -1,6 +1,7 @@
 import { runScan } from "./cli/commands/scan"
 import { runAnalyze } from "./cli/commands/analyze"
 import { runSnapshot } from "./cli/commands/snapshot"
+import { runGenerate } from "./cli/commands/generate"
 import { runRun } from "./cli/commands/run"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
@@ -43,6 +44,13 @@ function printHelp(): void {
     "    diff    — compare current contract vs saved baseline",
     "    approve — accept current contract as new baseline",
     "",
+    "  archtest generate --project <path>",
+    "    Generate Jest .spec.ts test files from the contract",
+    "    Options:",
+    "      --output <dir>        Output directory (default: .archtest/generated)",
+    "      --base-url <url>      Default server URL in generated files",
+    "      --json                Output metadata as JSON instead of writing files",
+    "",
     "  archtest run --project <path> --base-url <url>",
     "    Execute generated test cases against a running server",
     "    Options:",
@@ -59,11 +67,11 @@ function printHelp(): void {
     "  ARCHMIND_BIN   Path to archmind binary (default: archmind on PATH)",
     "",
     "Examples:",
-    "  archtest analyze --project ./my-nestjs-app",
-    "  archtest analyze --project ./my-nestjs-app --route 'POST /users'",
-    "  archtest snapshot save    --project ./my-nestjs-app",
-    "  archtest snapshot diff    --project ./my-nestjs-app",
-    "  archtest run  --project ./my-nestjs-app --base-url http://localhost:3000",
+    "  archtest analyze  --project ./my-nestjs-app",
+    "  archtest snapshot save --project ./my-nestjs-app",
+    "  archtest snapshot diff --project ./my-nestjs-app",
+    "  archtest generate --project ./my-nestjs-app --output ./tests/contract",
+    "  archtest run      --project ./my-nestjs-app --base-url http://localhost:3000",
     "",
   ].join("\n"))
 }
@@ -91,6 +99,11 @@ async function main(): Promise<void> {
 
   if (command === "snapshot") {
     await runSnapshot(positional[0], flags)
+    return
+  }
+
+  if (command === "generate") {
+    await runGenerate(flags)
     return
   }
 
