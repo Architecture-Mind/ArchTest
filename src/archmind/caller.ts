@@ -31,7 +31,12 @@ export class ArchmindCaller {
   }
 
   private run(args: string[], opts: { allowNonZero?: boolean } = {}): string {
-    const result = spawnSync(this.bin, args, {
+    // .js / .cjs files can't be executed directly on Windows — wrap with node
+    const isScript = /\.(c?js)$/i.test(this.bin)
+    const cmd      = isScript ? "node" : this.bin
+    const cmdArgs  = isScript ? [this.bin, ...args] : args
+
+    const result = spawnSync(cmd, cmdArgs, {
       encoding: "utf-8",
       maxBuffer: 50 * 1024 * 1024, // 50 MB — large projects
     })
