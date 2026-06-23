@@ -19,7 +19,8 @@ const FINDINGS_OUTPUT = [
 ]
 
 describe("ArchmindCaller", () => {
-  const caller = new ArchmindCaller({ projectRoot: "/fake/project" })
+  // Pass explicit bin to isolate spawn logic from bin-resolution logic
+  const caller = new ArchmindCaller({ projectRoot: "/fake/project", bin: "archmind" })
 
   beforeEach(() => jest.clearAllMocks())
 

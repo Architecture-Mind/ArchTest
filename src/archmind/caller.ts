@@ -1,11 +1,41 @@
 import { spawnSync } from "child_process"
+import { existsSync } from "fs"
+import { join } from "path"
 import type { TraceJsonOutput, FindingsJsonOutput } from "../types"
 
 export interface CallerOptions {
-  /** Path to archmind binary. Defaults to "archmind" (expects it on PATH). */
+  /**
+   * Path to archmind binary.
+   * Defaults to auto-resolve: node_modules first, then PATH.
+   */
   bin?: string
   /** Absolute path to the project being scanned. */
   projectRoot: string
+}
+
+/**
+ * Resolves the archmind binary path.
+ * Priority:
+ *   1. Explicit `bin` option (--archmind-bin flag or ARCHMIND_BIN env)
+ *   2. Local node_modules (installed as dependency of archtest)
+ *   3. Global PATH
+ */
+function resolveBin(explicit?: string): string {
+  if (explicit) return explicit
+
+  // Walk up from this file to find node_modules/@kidkender/archmind.
+  // __dirname is dist/ after build, so ../node_modules is the project root.
+  const candidates = [
+    join(__dirname, "../node_modules/@kidkender/archmind/dist/index.cjs"),
+    join(__dirname, "../../node_modules/@kidkender/archmind/dist/index.cjs"),
+    join(__dirname, "../../../node_modules/@kidkender/archmind/dist/index.cjs"),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  return "archmind"  // fallback: expect on PATH
 }
 
 export class ArchmindCaller {
@@ -13,7 +43,7 @@ export class ArchmindCaller {
   private readonly projectRoot: string
 
   constructor(opts: CallerOptions) {
-    this.bin         = opts.bin ?? "archmind"
+    this.bin         = resolveBin(opts.bin)
     this.projectRoot = opts.projectRoot
   }
 
@@ -63,9 +93,8 @@ export class ArchmindCaller {
 export class ArchmindNotFoundError extends Error {
   constructor(bin: string, cause: Error) {
     super(
-      `Cannot find "${bin}" on PATH.\n` +
-      `Install it: npm install -g @kidkender/archmind\n` +
-      `Or set ARCHMIND_BIN env to its absolute path.\n` +
+      `Cannot find archmind binary ("${bin}").\n` +
+      `Try reinstalling: npm install -g @kidkender/archtest\n` +
       `Cause: ${cause.message}`
     )
     this.name = "ArchmindNotFoundError"
