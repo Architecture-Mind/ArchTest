@@ -11,11 +11,12 @@ const BOLD  = "\x1b[1m"
 const GREEN = "\x1b[32m"
 
 export async function runGenerate(flags: Record<string, string>): Promise<void> {
-  const projectRoot = requireProject(flags)
-  const bin         = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
-  const outputDir   = flags["output"] ?? ".archtest/generated"
-  const baseUrl     = flags["base-url"] ?? "http://localhost:3000"
-  const isJson      = "json" in flags
+  const projectRoot      = requireProject(flags)
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
+  const outputDir        = flags["output"] ?? ".archtest/generated"
+  const baseUrl          = flags["base-url"] ?? "http://localhost:3000"
+  const isJson           = "json" in flags
 
   const absProject = resolve(projectRoot)
   const absOutput  = resolve(outputDir)
@@ -28,7 +29,7 @@ export async function runGenerate(flags: Record<string, string>): Promise<void> 
   // ── 1. Scan ──────────────────────────────────────────────────────────────────
   let scanResult
   try {
-    scanResult = await scanProject({ projectRoot: absProject, bin })
+    scanResult = await scanProject({ projectRoot: absProject, bin, framework: frameworkOverride })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)

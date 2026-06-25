@@ -28,17 +28,18 @@ const SEVERITY_ORDER: Record<LintSeverity, number> = { high: 0, warn: 1, info: 2
 const MIN_SEVERITY_DEFAULT: LintSeverity = "info"
 
 export async function runLintCmd(flags: Record<string, string>): Promise<void> {
-  const projectRoot  = requireProject(flags)
-  const bin          = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
-  const isJson       = "json" in flags
-  const minSeverity  = (flags["min-severity"] as LintSeverity | undefined) ?? MIN_SEVERITY_DEFAULT
+  const projectRoot      = requireProject(flags)
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
+  const isJson           = "json" in flags
+  const minSeverity      = (flags["min-severity"] as LintSeverity | undefined) ?? MIN_SEVERITY_DEFAULT
 
   if (!isJson) console.log(`Scanning: ${resolve(projectRoot)}\n`)
 
   // ── 1. Scan + Enrich ─────────────────────────────────────────────────────────
   let scanResult
   try {
-    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin })
+    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin, framework: frameworkOverride })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)
