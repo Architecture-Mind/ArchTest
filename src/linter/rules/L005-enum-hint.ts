@@ -1,7 +1,8 @@
 import type { LintRule, LintResult } from "../types"
 import type { EnrichedGraph } from "../../enricher/types"
 
-const ENUM_HINT_NAMES = ["status", "role", "type", "state", "kind", "category", "mode"]
+// "type" and "kind" excluded — too generic, cause more false positives than signal
+const ENUM_HINT_NAMES = ["status", "role", "state", "category", "mode"]
 
 export const L005: LintRule = {
   code: "L005",

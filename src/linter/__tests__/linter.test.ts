@@ -178,13 +178,26 @@ describe("L005 — enum field without constraint", () => {
     expect(runLint(graphs).some(r => r.code === "L005" && r.field === "status")).toBe(true)
   })
 
-  it("flags fields named role and type too", () => {
+  it("flags field named role", () => {
     const graphs = [graph("POST", "/users", {
-      dtos: [dto("Dto", [field("role", "required"), field("type", "required")])],
+      dtos: [dto("Dto", [field("role", "required")])],
     })]
     const fields = runLint(graphs).filter(r => r.code === "L005").map(r => r.field)
     expect(fields).toContain("role")
-    expect(fields).toContain("type")
+  })
+
+  it("does not flag field named 'type' (too generic, excluded)", () => {
+    const graphs = [graph("POST", "/events", {
+      dtos: [dto("Dto", [field("type", "required")])],
+    })]
+    expect(runLint(graphs).some(r => r.code === "L005" && r.field === "type")).toBe(false)
+  })
+
+  it("does not flag field named 'kind' (too generic, excluded)", () => {
+    const graphs = [graph("POST", "/items", {
+      dtos: [dto("Dto", [field("kind", "required")])],
+    })]
+    expect(runLint(graphs).some(r => r.code === "L005" && r.field === "kind")).toBe(false)
   })
 
   it("does not flag if field has isIn rule", () => {
@@ -215,6 +228,93 @@ describe("L005 — enum field without constraint", () => {
   })
 })
 
+// ── L006 — Missing throttle on auth-sensitive routes ─────────────────────────
+
+describe("L006 — missing throttle on auth route", () => {
+  it("flags POST /auth/login with no throttle node", () => {
+    const graphs = [graph("POST", "/auth/login")]
+    expect(runLint(graphs).some(r => r.code === "L006" && r.route === "POST /auth/login")).toBe(true)
+  })
+
+  it("flags routes matching /register, /signin, /password, /token", () => {
+    const paths = ["/auth/register", "/auth/signin", "/users/password/reset", "/oauth/token"]
+    const graphs = paths.map(p => graph("POST", p))
+    const flagged = runLint(graphs).filter(r => r.code === "L006").map(r => r.route)
+    expect(flagged).toContain("POST /auth/register")
+    expect(flagged).toContain("POST /auth/signin")
+    expect(flagged).toContain("POST /users/password/reset")
+    expect(flagged).toContain("POST /oauth/token")
+  })
+
+  it("does not flag when a throttle node is present", () => {
+    const g: EnrichedGraph = {
+      ...graph("POST", "/auth/login"),
+      nodes: [{ id: "t0", type: "ir:throttle", symbol: "ThrottleGuard" }],
+    }
+    expect(runLint([g]).some(r => r.code === "L006")).toBe(false)
+  })
+
+  it("does not flag when symbol matches throttle pattern", () => {
+    const g: EnrichedGraph = {
+      ...graph("POST", "/auth/login"),
+      nodes: [{ id: "t0", type: "ir:middleware", symbol: "RateLimitGuard" }],
+    }
+    expect(runLint([g]).some(r => r.code === "L006")).toBe(false)
+  })
+
+  it("does not flag non-auth routes", () => {
+    const graphs = [graph("POST", "/products"), graph("GET", "/users")]
+    expect(runLint(graphs).some(r => r.code === "L006")).toBe(false)
+  })
+
+  it("severity is warn", () => {
+    const graphs = [graph("POST", "/auth/login")]
+    expect(runLint(graphs).find(r => r.code === "L006")!.severity).toBe("warn")
+  })
+})
+
+// ── L007 — Admin/privileged route without auth ────────────────────────────────
+
+describe("L007 — privileged route without auth", () => {
+  it("flags GET /admin/users with no auth gate", () => {
+    const graphs = [graph("GET", "/admin/users")]
+    expect(runLint(graphs).some(r => r.code === "L007" && r.route === "GET /admin/users")).toBe(true)
+  })
+
+  it("flags routes matching /internal, /management, /backoffice, /system", () => {
+    const paths = ["/internal/health-check", "/management/users", "/backoffice/orders", "/system/config"]
+    const graphs = paths.map(p => graph("GET", p))
+    const flagged = runLint(graphs).filter(r => r.code === "L007").map(r => r.route)
+    expect(flagged).toContain("GET /internal/health-check")
+    expect(flagged).toContain("GET /management/users")
+    expect(flagged).toContain("GET /backoffice/orders")
+    expect(flagged).toContain("GET /system/config")
+  })
+
+  it("does not flag privileged route that has auth gate", () => {
+    const graphs = [graph("GET", "/admin/users", { withAuth: true })]
+    expect(runLint(graphs).some(r => r.code === "L007")).toBe(false)
+  })
+
+  it("does not flag when authz_check node is present", () => {
+    const g: EnrichedGraph = {
+      ...graph("GET", "/admin/users"),
+      nodes: [{ id: "a0", type: "ir:authz_check", symbol: "AdminGuard" }],
+    }
+    expect(runLint([g]).some(r => r.code === "L007")).toBe(false)
+  })
+
+  it("does not flag non-privileged routes regardless of auth", () => {
+    const graphs = [graph("GET", "/products"), graph("POST", "/orders")]
+    expect(runLint(graphs).some(r => r.code === "L007")).toBe(false)
+  })
+
+  it("severity is high", () => {
+    const graphs = [graph("GET", "/admin/dashboard")]
+    expect(runLint(graphs).find(r => r.code === "L007")!.severity).toBe("high")
+  })
+})
+
 // ── Multiple issues on same route ─────────────────────────────────────────────
 
 describe("multiple issues", () => {
@@ -227,5 +327,6 @@ describe("multiple issues", () => {
     const codes = results.map(r => r.code)
     expect(codes).toContain("L002")  // weak password
     expect(codes).toContain("L003")  // no auth on POST
+    expect(codes).toContain("L006")  // no throttle on auth route
   })
 })
