@@ -9,8 +9,8 @@ const TRACE_OUTPUT = {
   framework: "nestjs",
   routes_found: 2,
   graphs: [
-    { entrypoint: "GET /users", method: "GET", path: "/users", nodes: [], edges: [] },
-    { entrypoint: "POST /users", method: "POST", path: "/users", nodes: [], edges: [] },
+    { entrypoint: "GET /users",  method: "GET",  path: "/users", nodes: [], edges: [], annotations: [] },
+    { entrypoint: "POST /users", method: "POST", path: "/users", nodes: [], edges: [], annotations: [] },
   ],
 }
 

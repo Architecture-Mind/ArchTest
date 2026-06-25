@@ -1,6 +1,8 @@
 import { spawnSync } from "child_process"
 import { existsSync } from "fs"
 import { join } from "path"
+import { ZodError } from "zod"
+import { TraceJsonOutputSchema, FindingsJsonOutputSchema } from "./schemas"
 import type { TraceJsonOutput, FindingsJsonOutput } from "../types"
 
 export interface CallerOptions {
@@ -47,17 +49,29 @@ export class ArchmindCaller {
     this.projectRoot = opts.projectRoot
   }
 
-  /** Run `archmind trace --project <root> --json` and return parsed output. */
+  /** Run `archmind trace --project <root> --json` and return validated output. */
   trace(): TraceJsonOutput {
     const raw = this.run(["trace", "--project", this.projectRoot, "--json"])
-    return JSON.parse(raw) as TraceJsonOutput
+    const parsed: unknown = JSON.parse(raw)
+    try {
+      return TraceJsonOutputSchema.parse(parsed) as unknown as TraceJsonOutput
+    } catch (err) {
+      if (err instanceof ZodError) throw new ArchmindFormatError("trace", err)
+      throw err
+    }
   }
 
-  /** Run `archmind findings --project <root> --json` and return parsed output. */
+  /** Run `archmind findings --project <root> --json` and return validated output. */
   findings(): FindingsJsonOutput {
     // findings exits with code 1 when issues found — that's expected, not an error
     const raw = this.run(["findings", "--project", this.projectRoot, "--json"], { allowNonZero: true })
-    return JSON.parse(raw) as FindingsJsonOutput
+    const parsed: unknown = JSON.parse(raw)
+    try {
+      return FindingsJsonOutputSchema.parse(parsed) as unknown as FindingsJsonOutput
+    } catch (err) {
+      if (err instanceof ZodError) throw new ArchmindFormatError("findings", err)
+      throw err
+    }
   }
 
   private run(args: string[], opts: { allowNonZero?: boolean } = {}): string {
@@ -105,5 +119,20 @@ export class ArchmindRunError extends Error {
   constructor(args: string[], code: number, detail: string) {
     super(`archmind ${args.join(" ")} exited with code ${code}: ${detail}`)
     this.name = "ArchmindRunError"
+  }
+}
+
+export class ArchmindFormatError extends Error {
+  constructor(command: string, cause: ZodError) {
+    const firstIssue = cause.issues[0]
+    const path = firstIssue?.path.join(".") || "(root)"
+    const msg  = firstIssue?.message ?? "unknown"
+    super(
+      `archmind ${command} output does not match expected format.\n` +
+      `  Field "${path}": ${msg}\n` +
+      `This may indicate an archmind version incompatibility.\n` +
+      `Run: archmind ${command} --json | head -5 to inspect the raw output.`
+    )
+    this.name = "ArchmindFormatError"
   }
 }
