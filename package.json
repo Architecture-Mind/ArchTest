@@ -1,6 +1,6 @@
 {
   "name": "@kidkender/archtest",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Code-first API contract intelligence — analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
   "type": "module",
   "bin": {
