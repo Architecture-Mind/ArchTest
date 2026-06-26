@@ -2,14 +2,15 @@ import { resolve } from "path"
 import { scanProject } from "../../archmind/scanner"
 
 export async function runScan(flags: Record<string, string>): Promise<void> {
-  const projectRoot = requireProject(flags)
-  const bin         = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const projectRoot      = requireProject(flags)
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
 
   console.log(`Scanning: ${projectRoot}`)
 
   let result
   try {
-    result = await scanProject({ projectRoot: resolve(projectRoot), bin })
+    result = await scanProject({ projectRoot: resolve(projectRoot), bin, framework: frameworkOverride })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)

@@ -1,6 +1,6 @@
 {
   "name": "@kidkender/archtest",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Code-first API contract intelligence — analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
   "type": "module",
   "bin": {
@@ -20,7 +20,8 @@
     "@kidkender/archmind": "^0.3.0",
     "@kidkender/archmind-laravel-parser": "^0.2.0",
     "@kidkender/archmind-nestjs-parser": "^0.3.0",
-    "@kidkender/archmind-protocol": "^0.2.0"
+    "@kidkender/archmind-protocol": "^0.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

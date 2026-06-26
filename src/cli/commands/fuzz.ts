@@ -13,13 +13,14 @@ const YELLOW = "\x1b[33m"
 const GREEN  = "\x1b[32m"
 
 export async function runFuzzCmd(flags: Record<string, string>): Promise<void> {
-  const projectRoot = requireValue(flags, "project")
-  const baseUrl     = requireValue(flags, "base-url")
-  const bin         = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
-  const timeoutMs   = Number(flags["timeout"]     ?? 5000)
-  const concurrency = Number(flags["concurrency"] ?? 5)
-  const reportFile  = flags["report"]
-  const isJson      = "json" in flags
+  const projectRoot      = requireValue(flags, "project")
+  const baseUrl          = requireValue(flags, "base-url")
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
+  const timeoutMs        = Number(flags["timeout"]     ?? 5000)
+  const concurrency      = Number(flags["concurrency"] ?? 5)
+  const reportFile       = flags["report"]
+  const isJson           = "json" in flags
 
   if (!isJson) {
     console.log(`${BOLD}archtest fuzz${RESET}`)
@@ -30,7 +31,7 @@ export async function runFuzzCmd(flags: Record<string, string>): Promise<void> {
   // ── 1. Scan + Enrich ─────────────────────────────────────────────────────────
   let scanResult
   try {
-    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin })
+    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin, framework: frameworkOverride })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)

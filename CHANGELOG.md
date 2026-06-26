@@ -6,6 +6,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] — 2026-06-26
+
+### Added
+
+- **Framework auto-detection** — `archtest` now detects NestJS/Laravel automatically from filesystem markers
+  - `nest-cli.json` or `@nestjs/core` in `package.json` → NestJS
+  - `laravel/framework` or `laravel/lumen-framework` in `composer.json` → Laravel
+  - Fallback to archmind CLI output if detection returns unknown
+
+- **`--framework` flag** — Override auto-detection on all commands
+  - `archtest analyze --project . --framework nestjs`
+  - Available on: `analyze`, `scan`, `snapshot`, `generate`, `verify`, `lint`, `fuzz`
+
+- **Zod boundary validation** — archmind CLI output is now validated with Zod schemas at parse time
+  - Clear `ArchmindFormatError` with field path and message when format drifts
+  - `looseObject` schemas allow protocol extension without breaking validation
+
+- **L006** — Linter rule: auth-sensitive routes (`/login`, `/register`, `/password`, `/token`, `/signin`) with no rate-limiting guard (WARN)
+
+- **L007** — Linter rule: privileged routes (`/admin`, `/internal`, `/management`, `/backoffice`, `/system`) with no auth gate (HIGH)
+
+### Fixed
+
+- **L005** — Removed `"type"` and `"kind"` from enum-hint field names; both caused false positives on generic string fields
+
+### Changed
+
+- `zod` added as a runtime dependency for CLI output validation
+
+---
+
 ## [0.2.0] — 2026-06-24
 
 ### Added

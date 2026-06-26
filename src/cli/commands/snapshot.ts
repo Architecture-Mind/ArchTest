@@ -22,18 +22,19 @@ export async function runSnapshot(sub: string | undefined, flags: Record<string,
     process.exit(2)
   }
 
-  const projectRoot = requireProject(flags)
-  const bin         = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
-  const isJson      = "json" in flags
-  const storeOpts   = { projectRoot: resolve(projectRoot), file: flags["file"] }
+  const projectRoot      = requireProject(flags)
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
+  const isJson           = "json" in flags
+  const storeOpts        = { projectRoot: resolve(projectRoot), file: flags["file"] }
 
   if (subcommand === "save" || subcommand === "approve") {
-    await runSave(resolve(projectRoot), bin, storeOpts, isJson)
+    await runSave(resolve(projectRoot), bin, frameworkOverride, storeOpts, isJson)
     return
   }
 
   if (subcommand === "diff") {
-    await runDiff(resolve(projectRoot), bin, storeOpts, isJson)
+    await runDiff(resolve(projectRoot), bin, frameworkOverride, storeOpts, isJson)
     return
   }
 }
@@ -43,12 +44,13 @@ export async function runSnapshot(sub: string | undefined, flags: Record<string,
 async function runSave(
   projectRoot: string,
   bin: string | undefined,
+  frameworkOverride: string | undefined,
   storeOpts: { projectRoot: string; file?: string },
   isJson: boolean
 ): Promise<void> {
   if (!isJson) console.log(`Scanning: ${projectRoot}\n`)
 
-  const { framework, graphs } = await scan(projectRoot, bin)
+  const { framework, graphs } = await scan(projectRoot, bin, frameworkOverride)
   const enriched = enrichGraphs(graphs, { projectRoot })
   const snapshot = captureSnapshot(enriched, framework)
   const filePath = saveSnapshot(snapshot, storeOpts)
@@ -73,6 +75,7 @@ async function runSave(
 async function runDiff(
   projectRoot: string,
   bin: string | undefined,
+  frameworkOverride: string | undefined,
   storeOpts: { projectRoot: string; file?: string },
   isJson: boolean
 ): Promise<void> {
@@ -86,7 +89,7 @@ async function runDiff(
 
   if (!isJson) console.log(`Scanning: ${projectRoot}\n`)
 
-  const { framework, graphs } = await scan(projectRoot, bin)
+  const { framework, graphs } = await scan(projectRoot, bin, frameworkOverride)
   const enriched = enrichGraphs(graphs, { projectRoot })
   const current  = captureSnapshot(enriched, framework)
   const diff     = diffSnapshots(baseline, current)
@@ -186,9 +189,9 @@ function printChange(change: Change): void {
 
 // ── Shared scan helper ────────────────────────────────────────────────────────
 
-async function scan(projectRoot: string, bin: string | undefined) {
+async function scan(projectRoot: string, bin: string | undefined, framework: string | undefined) {
   try {
-    return await scanProject({ projectRoot, bin })
+    return await scanProject({ projectRoot, bin, framework })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)

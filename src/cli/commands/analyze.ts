@@ -17,17 +17,18 @@ const DIM   = "\x1b[90m"
 const BOLD  = "\x1b[1m"
 
 export async function runAnalyze(flags: Record<string, string>): Promise<void> {
-  const projectRoot = requireProject(flags)
-  const bin         = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
-  const isJson      = "json" in flags
-  const routeFilter = flags["route"]
+  const projectRoot      = requireProject(flags)
+  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const frameworkOverride = flags["framework"]
+  const isJson           = "json" in flags
+  const routeFilter      = flags["route"]
 
   if (!isJson) console.log(`Scanning: ${resolve(projectRoot)}\n`)
 
   // ── 1. Scan ─────────────────────────────────────────────────────────────────
   let scanResult
   try {
-    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin })
+    scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin, framework: frameworkOverride })
   } catch (err: unknown) {
     console.error(err instanceof Error ? err.message : String(err))
     process.exit(1)
