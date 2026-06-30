@@ -78,11 +78,12 @@ archtest snapshot diff --project .
 ```
 
 ```
-BREAKING CHANGE  POST /users
-  age.min: 18 → 21
+✗ BREAKING  POST /users
+  [BREAKING] age.min: 18 → 21
+  [ok]       optional field added: nickname
 
-NEW FIELD  POST /users
-  phone: required, string
+~ NON-BREAKING  GET /orders
+  [loosened] name.maxLength: 100 → 255
 ```
 
 ```bash
@@ -90,12 +91,20 @@ NEW FIELD  POST /users
 archtest snapshot approve --project .
 ```
 
-Commit `.archtest/contract.json` to git. Add `snapshot diff` to CI — it exits `1` on breaking changes.
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | No changes |
+| `1` | Non-breaking changes only |
+| `2` | Breaking changes detected |
+
+Commit `.archtest/contract.json` to git. Use in CI:
 
 ```yaml
-# .github/workflows/contract.yml
 - name: Check API contract drift
   run: npx archtest snapshot diff --project .
+  # exits 2 on breaking changes → fails the pipeline
 ```
 
 ---
@@ -166,11 +175,40 @@ archtest lint --project .
 4 issues found (2 HIGH, 1 WARN, 1 INFO)
 ```
 
-Exits `1` if any HIGH issues are found. Use in CI as a quality gate:
+Exits `1` if any HIGH issues are found. Use as a CI quality gate.
+
+**Options:**
 
 ```bash
-archtest lint --project . --min-severity warn
-archtest lint --project . --json   # machine-readable output
+archtest lint --project . --min-severity warn   # filter by severity
+archtest lint --project . --explain             # show why + risk + fix per issue
+archtest lint --project . --ci                  # GitHub Actions annotation output
+archtest lint --project . --new-only            # only show issues not in baseline
+archtest lint --project . --json                # machine-readable output
+```
+
+**`--explain` output:**
+
+```
+  HIGH  GET /users/:id
+        [L008] route returns User directly — sensitive field "password" may leak
+
+        Why?
+        Route returns a database entity directly without going through a response DTO.
+
+        Risk
+        • password / salt / secret fields exposed to client
+        • Bypasses DTO filtering and @Exclude() decorators on the entity
+
+        Suggested Fix
+        Create a dedicated response DTO (e.g. UserResponse) and map the entity to it.
+```
+
+**`--ci` output (GitHub Actions):**
+
+```
+::error title=[L003] DELETE route has no auth guard::DELETE /users/:id
+::warning title=[L002] field "password" has no minLength::POST /auth/register
 ```
 
 **Built-in rules:**
@@ -178,10 +216,34 @@ archtest lint --project . --json   # machine-readable output
 | Code | Severity | Description |
 |------|----------|-------------|
 | L001 | WARN | DTO has no validated fields |
-| L002 | WARN | Password/secret field has no minLength |
+| L002 | WARN | Password/secret field has no `minLength` |
 | L003 | HIGH | POST/PUT/PATCH/DELETE route has no auth guard |
 | L004 | HIGH | Write route accepts body but has no DTO |
 | L005 | INFO | Field name suggests enum but no `IsIn`/`IsEnum` constraint |
+| L006 | WARN | Auth-sensitive route has no rate-limiting guard |
+| L007 | HIGH | Privileged route (`/admin`, `/internal`, ...) has no auth gate |
+| L008 | HIGH | Route returns entity directly — sensitive fields may leak |
+| L009 | WARN | GET list route has no pagination — potential large dataset exposure |
+| L010 | INFO | Circular DTO reference — may cause infinite serialization |
+
+---
+
+### `baseline` — Suppress known issues in CI
+
+Save current lint results as a baseline. Future runs with `--new-only` only surface regressions.
+
+```bash
+# Save baseline (commit this file)
+archtest baseline --project .
+
+# Only show issues introduced since baseline
+archtest lint --new-only --project .
+
+# Show what's in the baseline
+archtest baseline show --project .
+```
+
+The baseline is stored at `.archtest/lint-baseline.json`. Commit it to git so CI has a reference point.
 
 ---
 
@@ -197,13 +259,59 @@ archtest fuzz --project . --base-url http://localhost:3000
 Fuzzing 12 routes with 847 edge-case payloads...
 
   🐛 CRASH   POST /users  field: age    [overflow_number]  → 500 Internal Server Error
-  🐛 CRASH   POST /users  field: bio    [unicode_edge]     → 500 Internal Server Error
   ⚠ BYPASS  POST /items  field: price  [sql_injection]    → 200 OK (validation bypassed?)
 
-FINDINGS  2 crashes  847 payloads  (3241ms)
+── Field Coverage ───────────────────────────────────────
+  POST /users  email     64 payloads  12 categories  clean
+  POST /users  age       48 payloads   9 categories  1 crash
+  POST /items  price     48 payloads   9 categories  1 bypass
+
+FINDINGS  1 crash  847 payloads  (3241ms)
 ```
 
-Fuzz categories: `overflow_number`, `very_long_string`, `unicode_edge`, `sql_injection`, `template_injection`, `xss`, `type_confusion`, `whitespace_or_empty`, and more.
+Fuzz categories: `overflow_number`, `very_long_string`, `unicode_edge`, `sql_injection`, `template_injection`, `xss`, `type_confusion`, `whitespace_or_empty`, `null`, `undefined`, and more.
+
+---
+
+### `report` — Generate a shareable HTML or Markdown report
+
+Combine lint issues and snapshot diff into a single file for sharing with your team or storing as a CI artifact.
+
+```bash
+archtest report --project . --format html --out report.html
+archtest report --project . --format md   --out report.md
+```
+
+The report includes:
+- Summary card (lint issues, fuzz crashes, breaking changes, routes scanned)
+- Full lint issue table
+- Snapshot diff table with BREAKING / NON-BREAKING labels
+- Field coverage table (if fuzz data is provided)
+
+---
+
+## Config File
+
+Create `archtest.config.json` at your project root to customize rule behavior:
+
+```json
+{
+  "rules": {
+    "L008": "error",
+    "L009": "warning",
+    "L010": "off"
+  },
+  "ignore": [
+    { "rule": "L009", "route": "GET /admin/export" }
+  ]
+}
+```
+
+| Option | Values | Description |
+|--------|--------|-------------|
+| `rules.<code>` | `"error"` `"warning"` `"info"` `"off"` | Override rule severity or disable entirely |
+| `ignore[].rule` | rule code | Suppress a rule globally |
+| `ignore[].route` | `"GET /path"` | Suppress a rule only for a specific route |
 
 ---
 
@@ -228,7 +336,7 @@ Source Code
     ↓
 generator                   — produce test cases per validation rule
     ↓
-analyze / snapshot / generate / verify / lint / fuzz
+analyze / snapshot / generate / verify / lint / fuzz / baseline / report
 ```
 
 Given this DTO:
@@ -266,6 +374,12 @@ POST /users
 
 - Node.js 18+
 - A NestJS or Laravel project to scan
+
+---
+
+## License
+
+MIT © kidkender
 
 ---
 
