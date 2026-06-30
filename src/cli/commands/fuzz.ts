@@ -3,7 +3,7 @@ import { writeFileSync } from "fs"
 import { scanProject } from "../../archmind/scanner"
 import { enrichGraphs } from "../../enricher/index"
 import { buildFuzzCases, runFuzz } from "../../fuzzer/runner"
-import type { FuzzResult, FuzzSummary } from "../../fuzzer/types"
+import type { FuzzResult, FuzzSummary, FieldCoverage } from "../../fuzzer/types"
 
 const RESET  = "\x1b[0m"
 const BOLD   = "\x1b[1m"
@@ -63,6 +63,7 @@ export async function runFuzzCmd(flags: Record<string, string>): Promise<void> {
   }
 
   printFindings(summary.results)
+  printCoverage(summary)
   printSummary(summary.total, summary.crashes, summary.durationMs)
 
   if (reportFile) {
@@ -98,6 +99,26 @@ function printFindings(results: FuzzResult[]): void {
   console.log()
 }
 
+function printCoverage(summary: FuzzSummary): void {
+  const coverage = summary.fieldCoverage
+  if (coverage.length === 0) return
+
+  console.log(`${DIM}── Field Coverage ──────────────────────────────────────────${RESET}`)
+  for (const fc of coverage) {
+    const status = fc.crashes > 0
+      ? `${RED}${fc.crashes} crash${fc.crashes === 1 ? "" : "es"}${RESET}`
+      : fc.bypasses > 0
+        ? `${YELLOW}${fc.bypasses} bypass${fc.bypasses === 1 ? "" : "es"}${RESET}`
+        : `${GREEN}clean${RESET}`
+    const cats = fc.categoriesFuzzed.length
+    console.log(
+      `  ${DIM}${fc.route}${RESET}  ${BOLD}${fc.field}${RESET}` +
+      `  ${DIM}${fc.totalPayloads} payloads  ${cats} categories${RESET}  ${status}`
+    )
+  }
+  console.log()
+}
+
 function printSummary(total: number, crashes: number, durationMs: number): void {
   const icon = crashes > 0 ? `${RED}${BOLD}FINDINGS${RESET}` : `${GREEN}${BOLD}CLEAN${RESET}`
   console.log(`${icon}  ${crashes} crash${crashes === 1 ? "" : "es"}  ${DIM}${total} payloads  ${durationMs}ms${RESET}`)
@@ -105,11 +126,12 @@ function printSummary(total: number, crashes: number, durationMs: number): void 
 
 function buildJsonReport(summary: FuzzSummary) {
   return {
-    baseUrl:    summary.baseUrl,
-    startedAt:  summary.startedAt,
-    durationMs: summary.durationMs,
-    total:      summary.total,
-    crashes:    summary.crashes,
+    baseUrl:       summary.baseUrl,
+    startedAt:     summary.startedAt,
+    durationMs:    summary.durationMs,
+    total:         summary.total,
+    crashes:       summary.crashes,
+    fieldCoverage: summary.fieldCoverage,
     results: summary.results.map((r: FuzzResult) => ({
       route:        r.fuzzCase.route,
       field:        r.fuzzCase.fuzzField,

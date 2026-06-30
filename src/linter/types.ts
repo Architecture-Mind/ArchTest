@@ -4,13 +4,20 @@ export type LintSeverity = "high" | "warn" | "info"
 
 export interface LintResult {
   severity: LintSeverity
-  code:     string   // "L001"
-  route:    string   // "POST /users"
-  field?:   string   // undefined for route-level issues
+  code:     string
+  route:    string
+  field?:   string
   message:  string
 }
 
+export interface ExplainInfo {
+  why:  string
+  risk: string[]
+  fix:  string
+}
+
 export interface LintRule {
-  code: string
+  code:     string
+  explain?: ExplainInfo
   run(graphs: EnrichedGraph[]): LintResult[]
 }

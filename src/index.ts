@@ -5,6 +5,8 @@ import { runGenerate } from "./cli/commands/generate"
 import { runVerify } from "./cli/commands/verify"
 import { runLintCmd } from "./cli/commands/lint"
 import { runFuzzCmd } from "./cli/commands/fuzz"
+import { runBaselineCmd, runBaselineShowCmd } from "./cli/commands/baseline"
+import { runReportCmd } from "./cli/commands/report"
 
 function parseFlags(rawArgs: string[]): { flags: Record<string, string>; positional: string[] } {
   const flags: Record<string, string> = {}
@@ -44,6 +46,7 @@ function printHelp(): void {
     "    Track API contract changes across commits",
     "    save    — capture current contract as baseline",
     "    diff    — compare current contract vs saved baseline",
+    "              Exit codes: 0=no changes  1=non-breaking  2=breaking",
     "    approve — accept current contract as new baseline",
     "    Options: --framework <nestjs|laravel>",
     "",
@@ -77,7 +80,21 @@ function printHelp(): void {
     "    Static analysis — detect validation gaps and security issues without a server",
     "    Options:",
     "      --min-severity <high|warn|info>  Minimum severity to report (default: info)",
+    "      --explain                        Show why + risk + fix for each issue",
+    "      --ci                             Output GitHub Actions annotations (::error/::warning)",
+    "      --new-only                       Only show issues not present in the baseline",
     "      --json                           Output as JSON",
+    "",
+    "  archtest baseline [show] --project <path>",
+    "    Save current lint results as baseline; future runs with --new-only suppress these",
+    "    Options:",
+    "      --file <path>   Custom baseline file path",
+    "",
+    "  archtest report --project <path>",
+    "    Generate an HTML or Markdown report combining lint + snapshot diff",
+    "    Options:",
+    "      --format <html|md>   Output format (default: html)",
+    "      --out <file>         Output file (default: archtest-report.html)",
     "",
     "  archtest scan --project <path>",
     "    Low-level: show routes + security findings only",
@@ -140,6 +157,21 @@ async function main(): Promise<void> {
 
   if (command === "fuzz") {
     await runFuzzCmd(flags)
+    return
+  }
+
+  if (command === "baseline") {
+    const sub = positional[0]
+    if (sub === "show") {
+      runBaselineShowCmd(flags)
+    } else {
+      await runBaselineCmd(flags)
+    }
+    return
+  }
+
+  if (command === "report") {
+    await runReportCmd(flags)
     return
   }
 

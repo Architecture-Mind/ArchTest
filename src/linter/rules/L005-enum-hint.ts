@@ -6,6 +6,13 @@ const ENUM_HINT_NAMES = ["status", "role", "state", "category", "mode"]
 
 export const L005: LintRule = {
   code: "L005",
+
+  explain: {
+    why:  "A field named 'status', 'role', 'state', 'category', or 'mode' almost always has a fixed set of valid values. Without @IsIn() or @IsEnum(), any string is accepted.",
+    risk: ["Invalid state stored in the database", "Logic branches hit with undefined enum values", "Inconsistent data across rows"],
+    fix:  "Add @IsIn(['active', 'inactive']) or @IsEnum(StatusEnum) to the field.",
+  },
+
   run(graphs: EnrichedGraph[]): LintResult[] {
     const results: LintResult[] = []
     for (const g of graphs) {

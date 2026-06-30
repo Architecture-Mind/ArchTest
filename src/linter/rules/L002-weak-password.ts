@@ -5,6 +5,13 @@ const PASSWORD_NAMES = ["password", "passwd", "secret"]
 
 export const L002: LintRule = {
   code: "L002",
+
+  explain: {
+    why:  "Password / secret fields with no minLength constraint allow empty strings, single characters, or trivially guessable values to pass validation.",
+    risk: ["Weak credentials accepted and stored", "Brute-force attacks succeed faster", "Downstream auth bugs if empty password is treated as valid"],
+    fix:  "Add @MinLength(8) (or your policy minimum) to the password field.",
+  },
+
   run(graphs: EnrichedGraph[]): LintResult[] {
     const results: LintResult[] = []
     for (const g of graphs) {

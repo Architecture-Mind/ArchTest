@@ -96,11 +96,11 @@ async function runDiff(
 
   if (isJson) {
     console.log(JSON.stringify(diff, null, 2))
-    process.exit(diff.hasBreakingChanges ? 1 : 0)
+    process.exit(exitCodeForDiff(diff))
   }
 
   printDiff(diff)
-  process.exit(diff.hasBreakingChanges ? 1 : 0)
+  process.exit(exitCodeForDiff(diff))
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -185,6 +185,20 @@ function printChange(change: Change): void {
       }
       break
   }
+}
+
+// ── Exit codes ────────────────────────────────────────────────────────────────
+// 0 — no changes
+// 1 — non-breaking changes only
+// 2 — breaking changes detected
+
+function exitCodeForDiff(diff: ContractDiff): number {
+  if (diff.hasBreakingChanges) return 2
+  const hasAnyChanges =
+    diff.addedRoutes.length > 0 ||
+    diff.removedRoutes.length > 0 ||
+    diff.changedRoutes.length > 0
+  return hasAnyChanges ? 1 : 0
 }
 
 // ── Shared scan helper ────────────────────────────────────────────────────────

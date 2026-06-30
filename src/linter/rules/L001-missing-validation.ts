@@ -3,6 +3,13 @@ import type { EnrichedGraph } from "../../enricher/types"
 
 export const L001: LintRule = {
   code: "L001",
+
+  explain: {
+    why:  "A DTO with no validated fields means any payload passes through without inspection. Class-validator only validates decorated properties.",
+    risk: ["Arbitrary data accepted and persisted", "Type coercion vulnerabilities", "Unexpected fields stored in the database"],
+    fix:  "Add at least one class-validator decorator (e.g. @IsString(), @IsEmail()) to each field that should be constrained.",
+  },
+
   run(graphs: EnrichedGraph[]): LintResult[] {
     const results: LintResult[] = []
     for (const g of graphs) {

@@ -1,6 +1,6 @@
 import type { EnrichedGraph } from "../enricher/types"
 import type { ExecutorOptions } from "../executor/types"
-import type { FuzzCase, FuzzResult, FuzzSummary } from "./types"
+import type { FuzzCase, FuzzResult, FuzzSummary, FieldCoverage } from "./types"
 import { generateFuzzValues } from "./fuzz-values"
 import { validPayload } from "../generator/valid-value"
 
@@ -94,14 +94,49 @@ export async function runFuzz(
     Array.from({ length: Math.min(concurrency, cases.length || 1) }, () => worker())
   )
 
+  const fieldCoverage = computeFieldCoverage(results, cases)
+
   return {
-    baseUrl:    opts.baseUrl,
+    baseUrl:       opts.baseUrl,
     startedAt,
-    durationMs: Date.now() - wallStart,
-    total:      results.length,
-    crashes:    results.filter(r => r.status === "crash").length,
+    durationMs:    Date.now() - wallStart,
+    total:         results.length,
+    crashes:       results.filter(r => r.status === "crash").length,
     results,
+    fieldCoverage,
+    coveragePct:   fieldCoverage.length > 0 ? 100 : 0,
   }
+}
+
+function computeFieldCoverage(results: FuzzResult[], cases: FuzzCase[]): FieldCoverage[] {
+  // Build a map of route+field → all cases and their results
+  const map = new Map<string, { route: string; field: string; categories: Set<string>; crashes: number; bypasses: number; total: number }>()
+
+  for (const fc of cases) {
+    const key = `${fc.route}|${fc.fuzzField}`
+    if (!map.has(key)) {
+      map.set(key, { route: fc.route, field: fc.fuzzField, categories: new Set(), crashes: 0, bypasses: 0, total: 0 })
+    }
+    map.get(key)!.categories.add(fc.fuzzCategory)
+    map.get(key)!.total++
+  }
+
+  for (const r of results) {
+    const key = `${r.fuzzCase.route}|${r.fuzzCase.fuzzField}`
+    const entry = map.get(key)
+    if (!entry) continue
+    if (r.status === "crash")        entry.crashes++
+    if (r.status === "unexpected_ok") entry.bypasses++
+  }
+
+  return [...map.values()].map(e => ({
+    route:            e.route,
+    field:            e.field,
+    totalPayloads:    e.total,
+    categoriesFuzzed: [...e.categories].sort(),
+    crashes:          e.crashes,
+    bypasses:         e.bypasses,
+  }))
 }
 
 async function executeFuzzCase(
