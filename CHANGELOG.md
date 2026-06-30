@@ -6,6 +6,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.0] — 2026-06-30
+
+### Added
+
+- **L008** — Linter rule: route returns a database entity directly without a response DTO (HIGH)
+  - Detects `ir:entity_return` nodes with no `ir:response_transformer` or `ir:serializer`
+  - Message names the entity and highlights any sensitive fields (password, salt, refreshToken, etc.)
+
+- **L009** — Linter rule: GET list route has no pagination guard (WARN)
+  - Flags collection routes (`GET /users`, `GET /orders`) with no `limit`/`offset`/`page`/`cursor` param and no `ir:paginator` node
+  - Skips single-resource routes (`/users/:id`, `/posts/{id}`)
+
+- **L010** — Linter rule: circular DTO reference — two DTOs referencing each other's class in field types (INFO)
+  - Detects `UserDto.posts: PostDto` ↔ `PostDto.author: UserDto` cycles
+  - Each pair reported once; does not flag non-circular or unknown-class references
+
+- **`--explain` flag** for `archtest lint`
+  - Every rule (L001–L010) now exposes `why`, `risk[]`, and `fix` text
+  - Printed inline below each finding when `--explain` is passed
+
+- **`--ci` flag** for `archtest lint`
+  - Outputs GitHub Actions workflow commands (`::error`/`::warning`/`::notice`)
+  - Annotates PRs inline; no separate Action config required
+
+- **`--new-only` flag** for `archtest lint`
+  - Suppresses issues that were present in the saved baseline
+  - Designed for legacy codebases — only surface regressions in CI
+
+- **`archtest baseline`** — save current lint results as a baseline
+  - Stored at `.archtest/lint-baseline.json` (committable)
+  - `archtest baseline show` prints baseline summary
+  - `--file <path>` to use a custom location
+
+- **`archtest report`** — generate an HTML or Markdown report
+  - Combines lint issues + snapshot diff into a single shareable file
+  - `--format html` (default) or `--format md`
+  - `--out <file>` to set output path (default: `archtest-report.html`)
+  - Suitable for CI artifacts and sharing with non-terminal stakeholders
+
+- **Config file** — `archtest.config.json` at project root
+  - `rules: { L008: "error", L009: "warning", L010: "off" }` — remap or disable rules
+  - `ignore: [{ rule, route? }]` — suppress specific route/rule combinations
+  - Also loaded from `.archtest/config.json` as fallback
+
+- **Fuzz field coverage tracking**
+  - After each fuzz run, shows a per-field breakdown: payloads fired, categories covered, crashes and bypasses
+  - Included in `--json` report output under `fieldCoverage`
+
+### Changed
+
+- **`archtest snapshot diff` exit codes** now distinguish change severity:
+  - `0` — no changes
+  - `1` — non-breaking changes only
+  - `2` — breaking changes detected
+  - Previously both breaking and non-breaking exited with `1`
+
+- `@kidkender/archmind` dependency bumped to `^0.4.0`
+
+---
+
 ## [0.3.0] — 2026-06-26
 
 ### Added
