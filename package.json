@@ -1,7 +1,7 @@
 {
   "name": "@kidkender/archtest",
-  "version": "0.3.0",
-  "description": "Code-first API contract intelligence — analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
+  "version": "0.4.0",
+  "description": "Code-first API contract intelligence \u2014 analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
   "type": "module",
   "bin": {
     "archtest": "./dist/index.cjs"
@@ -17,7 +17,7 @@
     "dist/index.cjs"
   ],
   "dependencies": {
-    "@kidkender/archmind": "^0.3.0",
+    "@kidkender/archmind": "^0.4.0",
     "@kidkender/archmind-laravel-parser": "^0.2.0",
     "@kidkender/archmind-nestjs-parser": "^0.3.0",
     "@kidkender/archmind-protocol": "^0.2.0",
