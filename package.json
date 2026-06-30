@@ -1,10 +1,10 @@
 {
   "name": "@kidkender/archtest",
   "version": "0.4.0",
-  "description": "Code-first API contract intelligence \u2014 analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
+  "description": "Code-first API contract intelligence — analyze, snapshot, generate, verify, lint, and fuzz your API from source code. No Swagger required.",
   "type": "module",
   "bin": {
-    "archtest": "./dist/index.cjs"
+    "archtest": "dist/index.cjs"
   },
   "scripts": {
     "build": "node build.mjs",
@@ -46,7 +46,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Architecture-Mind/ArchTest"
+    "url": "git+https://github.com/Architecture-Mind/ArchTest.git"
   },
   "engines": {
     "node": ">=18"
