@@ -14,11 +14,22 @@ export interface FuzzResult {
   error?:      string
 }
 
+export interface FieldCoverage {
+  route:            string
+  field:            string
+  totalPayloads:    number
+  categoriesFuzzed: string[]
+  crashes:          number
+  bypasses:         number
+}
+
 export interface FuzzSummary {
-  baseUrl:    string
-  startedAt:  string
-  durationMs: number
-  total:      number
-  crashes:    number
-  results:    FuzzResult[]
+  baseUrl:       string
+  startedAt:     string
+  durationMs:    number
+  total:         number
+  crashes:       number
+  results:       FuzzResult[]
+  fieldCoverage: FieldCoverage[]
+  coveragePct:   number
 }

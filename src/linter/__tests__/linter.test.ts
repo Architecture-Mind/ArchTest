@@ -315,6 +315,278 @@ describe("L007 — privileged route without auth", () => {
   })
 })
 
+// ── L008 — Entity leak ───────────────────────────────────────────────────────
+
+describe("L008 — entity returned directly", () => {
+  function graphWithEntity(path: string, entitySymbol: string, withTransformer = false): EnrichedGraph {
+    const nodes: EnrichedGraph["nodes"] = [
+      { id: "e0", type: "ir:entity_return", symbol: entitySymbol },
+    ]
+    if (withTransformer) {
+      nodes.push({ id: "t0", type: "ir:response_transformer", symbol: "UserResponse" })
+    }
+    return { entrypoint: `GET ${path}`, method: "GET", path, nodes, edges: [], framework: "nestjs", dtos: [] }
+  }
+
+  it("flags route that returns entity with no response transformer", () => {
+    const graphs = [graphWithEntity("/users/:id", "User")]
+    expect(runLint(graphs).some(r => r.code === "L008" && r.route === "GET /users/:id")).toBe(true)
+  })
+
+  it("does not flag when response transformer is present", () => {
+    const graphs = [graphWithEntity("/users/:id", "User", true)]
+    expect(runLint(graphs).some(r => r.code === "L008")).toBe(false)
+  })
+
+  it("does not flag when serializer node is present", () => {
+    const g: EnrichedGraph = {
+      ...graphWithEntity("/users/:id", "User"),
+      nodes: [
+        { id: "e0", type: "ir:entity_return", symbol: "User" },
+        { id: "s0", type: "ir:serializer", symbol: "UserSerializer" },
+      ],
+    }
+    expect(runLint([g]).some(r => r.code === "L008")).toBe(false)
+  })
+
+  it("does not flag route with no entity_return node", () => {
+    const graphs = [graph("GET", "/users/:id")]
+    expect(runLint(graphs).some(r => r.code === "L008")).toBe(false)
+  })
+
+  it("message names the entity symbol", () => {
+    const graphs = [graphWithEntity("/users/:id", "UserEntity")]
+    const r = runLint(graphs).find(r => r.code === "L008")!
+    expect(r.message).toContain("UserEntity")
+  })
+
+  it("message mentions sensitive field when DTO contains one", () => {
+    const g: EnrichedGraph = {
+      ...graphWithEntity("/users/:id", "User"),
+      dtos: [dto("User", [field("password", "required")])],
+    }
+    const r = runLint([g]).find(r => r.code === "L008")!
+    expect(r.message).toContain("password")
+  })
+
+  it("severity is high", () => {
+    const graphs = [graphWithEntity("/users/:id", "User")]
+    expect(runLint(graphs).find(r => r.code === "L008")!.severity).toBe("high")
+  })
+})
+
+// ── L009 — Missing pagination ─────────────────────────────────────────────────
+
+describe("L009 — missing pagination on list route", () => {
+  it("flags GET list route with no pagination fields or paginator", () => {
+    const graphs = [graph("GET", "/users")]
+    expect(runLint(graphs).some(r => r.code === "L009" && r.route === "GET /users")).toBe(true)
+  })
+
+  it("flags GET /orders with no pagination", () => {
+    const graphs = [graph("GET", "/orders")]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(true)
+  })
+
+  it("does not flag single-resource route GET /users/:id", () => {
+    const graphs = [graph("GET", "/users/:id")]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag single-resource route GET /posts/{id}", () => {
+    const graphs = [graph("GET", "/posts/{id}")]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag when DTO has 'limit' field", () => {
+    const graphs = [graph("GET", "/users", {
+      dtos: [dto("QueryDto", [field("limit", "required")])],
+    })]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag when DTO has 'page' field", () => {
+    const graphs = [graph("GET", "/users", {
+      dtos: [dto("QueryDto", [field("page", "required")])],
+    })]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag when DTO has 'cursor' field", () => {
+    const graphs = [graph("GET", "/users", {
+      dtos: [dto("QueryDto", [field("cursor", "required")])],
+    })]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag when ir:paginator node is present", () => {
+    const g: EnrichedGraph = {
+      ...graph("GET", "/users"),
+      nodes: [{ id: "p0", type: "ir:paginator", symbol: "Paginate" }],
+    }
+    expect(runLint([g]).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not flag POST routes", () => {
+    const graphs = [graph("POST", "/users")]
+    expect(runLint(graphs).some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("severity is warn", () => {
+    const graphs = [graph("GET", "/users")]
+    expect(runLint(graphs).find(r => r.code === "L009")!.severity).toBe("warn")
+  })
+})
+
+// ── L010 — Circular DTO ───────────────────────────────────────────────────────
+
+describe("L010 — circular DTO reference", () => {
+  type AnyType = DTOSchema["fields"][0]["type"]
+
+  function circularGraph(): EnrichedGraph {
+    return {
+      entrypoint: "GET /feed",
+      method:     "GET",
+      path:       "/feed",
+      nodes:      [],
+      edges:      [],
+      framework:  "nestjs",
+      dtos: [
+        {
+          className: "UserDto",
+          file: "user.dto.ts",
+          fields: [{ name: "posts", type: "PostDto" as AnyType, rules: [] }],
+        },
+        {
+          className: "PostDto",
+          file: "post.dto.ts",
+          fields: [{ name: "author", type: "UserDto" as AnyType, rules: [] }],
+        },
+      ],
+    }
+  }
+
+  it("flags circular reference between two DTOs", () => {
+    expect(runLint([circularGraph()]).some(r => r.code === "L010")).toBe(true)
+  })
+
+  it("message names both DTOs", () => {
+    const r = runLint([circularGraph()]).find(r => r.code === "L010")!
+    expect(r.message).toContain("UserDto")
+    expect(r.message).toContain("PostDto")
+  })
+
+  it("does not report the same pair twice", () => {
+    const results = runLint([circularGraph()]).filter(r => r.code === "L010")
+    expect(results.length).toBe(1)
+  })
+
+  it("does not flag DTO that references unknown class", () => {
+    const g: EnrichedGraph = {
+      entrypoint: "GET /items",
+      method: "GET",
+      path: "/items",
+      nodes: [], edges: [], framework: "nestjs",
+      dtos: [{
+        className: "ItemDto",
+        file: "item.dto.ts",
+        fields: [{ name: "category", type: "CategoryDto" as AnyType, rules: [] }],
+      }],
+    }
+    expect(runLint([g]).some(r => r.code === "L010")).toBe(false)
+  })
+
+  it("does not flag non-circular reference", () => {
+    const g: EnrichedGraph = {
+      entrypoint: "GET /items",
+      method: "GET",
+      path: "/items",
+      nodes: [], edges: [], framework: "nestjs",
+      dtos: [
+        { className: "ItemDto", file: "a.ts", fields: [{ name: "cat",  type: "CatDto" as AnyType, rules: [] }] },
+        { className: "CatDto",  file: "b.ts", fields: [{ name: "name", type: "string",             rules: [] }] },
+      ],
+    }
+    expect(runLint([g]).some(r => r.code === "L010")).toBe(false)
+  })
+
+  it("severity is info", () => {
+    const r = runLint([circularGraph()]).find(r => r.code === "L010")!
+    expect(r.severity).toBe("info")
+  })
+})
+
+// ── Config — rule disable, severity override, ignore ─────────────────────────
+
+describe("config — rule disable", () => {
+  it("skips a rule when config sets it to off", () => {
+    const graphs = [graph("POST", "/orders")]
+    const results = runLint(graphs, { rules: { L004: "off" } })
+    expect(results.some(r => r.code === "L004")).toBe(false)
+  })
+
+  it("still runs other rules when one is disabled", () => {
+    const graphs = [graph("DELETE", "/items")]
+    const results = runLint(graphs, { rules: { L004: "off" } })
+    expect(results.some(r => r.code === "L003")).toBe(true)
+  })
+})
+
+describe("config — severity override", () => {
+  it("overrides severity to high when config sets rule to error", () => {
+    const graphs = [graph("POST", "/orders", { dtos: [dto("Dto", [field("status", "required")])] })]
+    const r = runLint(graphs, { rules: { L005: "error" } }).find(r => r.code === "L005")!
+    expect(r.severity).toBe("high")
+  })
+
+  it("overrides severity to warn when config sets rule to warning", () => {
+    const graphs = [graph("POST", "/orders")]
+    const r = runLint(graphs, { rules: { L003: "warning" } }).find(r => r.code === "L003")!
+    expect(r.severity).toBe("warn")
+  })
+
+  it("overrides severity to info when config sets rule to info", () => {
+    const graphs = [graph("DELETE", "/items")]
+    const r = runLint(graphs, { rules: { L003: "info" } }).find(r => r.code === "L003")!
+    expect(r.severity).toBe("info")
+  })
+})
+
+describe("config — ignore list", () => {
+  it("suppresses a result that matches rule + route", () => {
+    const graphs = [graph("GET", "/users"), graph("GET", "/orders")]
+    const results = runLint(graphs, { ignore: [{ rule: "L009", route: "GET /users" }] })
+    expect(results.some(r => r.code === "L009" && r.route === "GET /users")).toBe(false)
+    expect(results.some(r => r.code === "L009" && r.route === "GET /orders")).toBe(true)
+  })
+
+  it("suppresses all results for a rule when no route specified", () => {
+    const graphs = [graph("GET", "/users"), graph("GET", "/orders")]
+    const results = runLint(graphs, { ignore: [{ rule: "L009" }] })
+    expect(results.some(r => r.code === "L009")).toBe(false)
+  })
+
+  it("does not suppress results for other rules", () => {
+    const graphs = [graph("DELETE", "/items")]
+    const results = runLint(graphs, { ignore: [{ rule: "L009" }] })
+    expect(results.some(r => r.code === "L003")).toBe(true)
+  })
+})
+
+// ── explain — all rules have explain info ─────────────────────────────────────
+
+describe("explain — rules expose why/risk/fix", () => {
+  it("all rules have explain info", () => {
+    const { ALL_RULES } = require("../runner")
+    for (const rule of ALL_RULES) {
+      expect(rule.explain).toBeDefined()
+      expect(typeof rule.explain.why).toBe("string")
+      expect(Array.isArray(rule.explain.risk)).toBe(true)
+      expect(typeof rule.explain.fix).toBe("string")
+    }
+  })
+})
+
 // ── Multiple issues on same route ─────────────────────────────────────────────
 
 describe("multiple issues", () => {

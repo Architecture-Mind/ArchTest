@@ -9,6 +9,13 @@ function hasAuthGate(g: EnrichedGraph): boolean {
 
 export const L007: LintRule = {
   code: "L007",
+
+  explain: {
+    why:  "Routes under privileged paths (/admin, /internal, /management, etc.) have no auth guard. Any unauthenticated caller can reach administrative functionality.",
+    risk: ["Full admin access without credentials", "User data exposure", "Destructive operations available to public"],
+    fix:  "Add @UseGuards(JwtAuthGuard, RolesGuard) and @Roles('admin') to the controller or route.",
+  },
+
   run(graphs: EnrichedGraph[]): LintResult[] {
     const results: LintResult[] = []
     for (const g of graphs) {

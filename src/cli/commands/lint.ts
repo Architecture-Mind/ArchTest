@@ -1,7 +1,9 @@
 import { resolve } from "path"
 import { scanProject } from "../../archmind/scanner"
 import { enrichGraphs } from "../../enricher/index"
-import { runLint } from "../../linter/runner"
+import { runLint, ALL_RULES } from "../../linter/runner"
+import { loadConfig } from "../../config/index"
+import { loadBaseline } from "../../baseline/index"
 import type { LintResult, LintSeverity } from "../../linter/types"
 
 const RESET  = "\x1b[0m"
@@ -24,19 +26,22 @@ const SEVERITY_LABEL: Record<LintSeverity, string> = {
 }
 
 const SEVERITY_ORDER: Record<LintSeverity, number> = { high: 0, warn: 1, info: 2 }
-
 const MIN_SEVERITY_DEFAULT: LintSeverity = "info"
 
 export async function runLintCmd(flags: Record<string, string>): Promise<void> {
-  const projectRoot      = requireProject(flags)
-  const bin              = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
+  const projectRoot       = requireProject(flags)
+  const bin               = flags["archmind-bin"] ?? process.env["ARCHMIND_BIN"]
   const frameworkOverride = flags["framework"]
-  const isJson           = "json" in flags
-  const minSeverity      = (flags["min-severity"] as LintSeverity | undefined) ?? MIN_SEVERITY_DEFAULT
+  const isJson            = "json" in flags
+  const isExplain         = "explain" in flags
+  const isCi              = "ci" in flags
+  const isNewOnly         = "new-only" in flags
+  const minSeverity       = (flags["min-severity"] as LintSeverity | undefined) ?? MIN_SEVERITY_DEFAULT
 
-  if (!isJson) console.log(`Scanning: ${resolve(projectRoot)}\n`)
+  const config = loadConfig(projectRoot)
 
-  // ── 1. Scan + Enrich ─────────────────────────────────────────────────────────
+  if (!isJson && !isCi) console.log(`Scanning: ${resolve(projectRoot)}\n`)
+
   let scanResult
   try {
     scanResult = await scanProject({ projectRoot: resolve(projectRoot), bin, framework: frameworkOverride })
@@ -45,20 +50,43 @@ export async function runLintCmd(flags: Record<string, string>): Promise<void> {
     process.exit(1)
   }
 
-  const enriched = enrichGraphs(scanResult.graphs, { projectRoot: resolve(projectRoot) })
+  const enriched   = enrichGraphs(scanResult.graphs, { projectRoot: resolve(projectRoot) })
+  const allResults = runLint(enriched, config)
+  let results      = filterBySeverity(allResults, minSeverity)
 
-  // ── 2. Lint ───────────────────────────────────────────────────────────────────
-  const allResults = runLint(enriched)
-  const results    = filterBySeverity(allResults, minSeverity)
+  // --new-only: suppress issues present in baseline
+  if (isNewOnly) {
+    const baseline = loadBaseline({ projectRoot: resolve(projectRoot) })
+    if (baseline) {
+      const baselineKeys = new Set(baseline.issues.map(r => `${r.code}|${r.route}|${r.field ?? ""}|${r.message}`))
+      results = results.filter(r => !baselineKeys.has(`${r.code}|${r.route}|${r.field ?? ""}|${r.message}`))
+    }
+  }
 
-  // ── 3. Output ─────────────────────────────────────────────────────────────────
+  // ── JSON output ───────────────────────────────────────────────────────────────
   if (isJson) {
     console.log(JSON.stringify({ issues: results, total: results.length }, null, 2))
     process.exit(results.some(r => r.severity === "high") ? 1 : 0)
   }
 
+  // ── CI annotation output (GitHub Actions) ────────────────────────────────────
+  if (isCi) {
+    for (const r of results) {
+      const level = r.severity === "high" ? "error" : r.severity === "warn" ? "warning" : "notice"
+      const title = `[${r.code}] ${r.message}`
+      const loc   = r.field ? ` field=${r.field}` : ""
+      console.log(`::${level} title=${title}::${r.route}${loc}`)
+    }
+    process.exit(results.some(r => r.severity === "high") ? 1 : 0)
+  }
+
+  // ── Human output ──────────────────────────────────────────────────────────────
   if (results.length === 0) {
-    console.log(`${DIM}No issues found.${RESET}`)
+    if (isNewOnly) {
+      console.log(`${DIM}No new issues since baseline.${RESET}`)
+    } else {
+      console.log(`${DIM}No issues found.${RESET}`)
+    }
     process.exit(0)
   }
 
@@ -72,12 +100,37 @@ export async function runLintCmd(flags: Record<string, string>): Promise<void> {
     const loc   = r.field ? `${r.route}  ${DIM}field: ${r.field}${RESET}` : r.route
     console.log(`  ${color}${BOLD}${label}${RESET}  ${loc}`)
     console.log(`        ${DIM}[${r.code}] ${r.message}${RESET}`)
+
+    if (isExplain) {
+      printExplain(r)
+    }
   }
 
   console.log()
   printSummary(results)
 
   process.exit(results.some(r => r.severity === "high") ? 1 : 0)
+}
+
+function printExplain(r: LintResult): void {
+  const rule = ALL_RULES.find(rl => rl.code === r.code)
+  if (!rule?.explain) return
+
+  const { why, risk, fix } = rule.explain
+  console.log()
+  console.log(`        ${BOLD}Why?${RESET}`)
+  console.log(`        ${why}`)
+  if (risk.length > 0) {
+    console.log()
+    console.log(`        ${BOLD}Risk${RESET}`)
+    for (const item of risk) {
+      console.log(`        ${DIM}• ${item}${RESET}`)
+    }
+  }
+  console.log()
+  console.log(`        ${BOLD}Suggested Fix${RESET}`)
+  console.log(`        ${fix}`)
+  console.log()
 }
 
 function filterBySeverity(results: LintResult[], min: LintSeverity): LintResult[] {

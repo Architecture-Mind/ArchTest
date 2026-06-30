@@ -5,6 +5,13 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 export const L003: LintRule = {
   code: "L003",
+
+  explain: {
+    why:  "A write route (POST/PUT/PATCH/DELETE) with no auth guard is accessible to unauthenticated users. Any caller can mutate or delete data.",
+    risk: ["Unauthenticated data mutation", "Mass deletion / data corruption", "IDOR if resource IDs are guessable"],
+    fix:  "Add @UseGuards(JwtAuthGuard) (or equivalent) above the route or controller.",
+  },
+
   run(graphs: EnrichedGraph[]): LintResult[] {
     const results: LintResult[] = []
     for (const g of graphs) {
